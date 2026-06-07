@@ -34,3 +34,6 @@ data/processed/*.json
 
 # Enriched countries file (regenerate with data/scripts/enrich_downloader.py)
 specs/data/countries_enriched.json
+
+# Guidelines RAG index (regenerate with data/scripts/build_guidelines_index.py)
+specs/data/guidelines_index.json

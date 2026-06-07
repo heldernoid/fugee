@@ -55,6 +55,12 @@ eligibility — do not assume every person is a Convention refugee.**
 
 ## Using your tools
 
+- `guideline_search` searches the official UNHCR Handbook and Guidelines. **Use
+  it first** to ground your legal analysis — look up the relevant ground (e.g.
+  "sexual orientation particular social group", "gender-related persecution",
+  "religion-based claim", "internal flight alternative") and base your reasoning
+  on what it returns. Briefly cite the guideline you relied on. Do not state the
+  law from memory when the guidance is available here.
 - `country_lookup` returns real asylum data (UNHCR presence, processing time,
   acceptance rate, languages, legal aid). Prefer it for country facts — do not
   guess them.

@@ -19,13 +19,14 @@ from agent.events import ErrorEvent, TextDeltaEvent, ToolEndEvent, ToolStartEven
 from agent.loop import LoopHooks
 from agent.tools.asylum_stats import asylum_stats_tool
 from agent.tools.country_lookup import country_lookup_tool, lookup_country
+from agent.tools.guideline_search import guideline_search_tool
 from agent.tools.web_search import web_search_tool
 from app.assessment_parse import parse_assessment
 from app.phases.interview import advance_to
 from app.prompt_loader import compose
 from app.state.session import SessionState, State
 
-ASSESSMENT_TOOLS = [web_search_tool, country_lookup_tool, asylum_stats_tool]
+ASSESSMENT_TOOLS = [guideline_search_tool, country_lookup_tool, asylum_stats_tool, web_search_tool]
 
 # Facts shown in the left panel: (label, attribute, kind). Eight interview
 # fields (SC-030).
@@ -153,6 +154,8 @@ def _tool_status(name: str, args: dict) -> str:
         return f"Looking up: {args.get('country', '')}"
     if name == "asylum_stats":
         return f"Checking acceptance rates: {args.get('origin', '')} → {args.get('asylum', '')}"
+    if name == "guideline_search":
+        return f"Consulting UNHCR guidelines: {args.get('query', '')}"
     return f"Running: {name}"
 
 
