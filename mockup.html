@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Refuge — Design Walkthrough</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;450;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  /* ============================================================
+     REFUGE — design tokens
+     ============================================================ */
+  :root{
+    /* color */
+    --primary:#0E6A58;
+    --primary-deep:#0A5042;
+    --primary-tint:#E5EFEA;
+    --primary-tint-2:#D2E3DC;
+    --secondary:#2E7D6C;
+    --accent:#E07B39;
+    --accent-deep:#C26329;
+    --accent-tint:#FBEDE1;
+    --bg:#F7F5F0;
+    --surface:#FFFFFF;
+    --surface-2:#FCFBF7;
+    --text:#1A1A1A;
+    --text-secondary:#51596A;
+    --text-muted:#6B7280;
+    --line:#E7E2D8;
+    --line-strong:#D8D2C5;
+    --success:#2C8A59;
+    --success-tint:#E4F1EA;
+    --warning:#B5841C;
+    --warning-tint:#F6ECD6;
+    --danger:#BE3F2C;
+    --on-primary:#FFFFFF;
+    --on-accent:#FFFFFF;
+
+    /* radius */
+    --r-sm:4px;
+    --r-md:8px;
+    --r-lg:16px;
+    --r-full:9999px;
+
+    /* spacing */
+    --s-xs:4px;
+    --s-sm:8px;
+    --s-md:16px;
+    --s-lg:24px;
+    --s-xl:40px;
+    --s-xxl:64px;
+
+    /* elevation */
+    --shadow-sm:0 1px 2px rgba(13,46,38,.06), 0 1px 1px rgba(13,46,38,.04);
+    --shadow-md:0 6px 20px rgba(13,46,38,.08);
+    --shadow-lg:0 18px 48px rgba(13,46,38,.12);
+
+    --maxw:780px;
+  }
+
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:"Inter",system-ui,-apple-system,sans-serif;
+    font-size:16px;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+  }
+  h1,h2,h3,h4{margin:0;font-family:"Fraunces",Georgia,serif;color:var(--text);line-height:1.15;}
+  p{margin:0;}
+  a{color:inherit;}
+  button{font-family:inherit;cursor:pointer;}
+  ::selection{background:var(--primary-tint-2);}
+
+  :focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:var(--r-sm);}
+
+  /* ============================================================
+     Site chrome (walkthrough scaffold)
+     ============================================================ */
+  .site-bar{
+    position:sticky;top:0;z-index:50;
+    background:rgba(247,245,240,.86);
+    backdrop-filter:saturate(140%) blur(10px);
+    border-bottom:1px solid var(--line);
+  }
+  .site-bar__inner{
+    max-width:1180px;margin:0 auto;
+    display:flex;align-items:center;justify-content:space-between;gap:var(--s-md);
+    padding:14px clamp(16px,4vw,32px);
+  }
+  .brand{display:flex;align-items:center;gap:10px;text-decoration:none;}
+  .brand__mark{flex:0 0 auto;width:30px;height:30px;}
+  .brand__name{font-family:"Fraunces";font-weight:600;font-size:21px;letter-spacing:-.01em;color:var(--primary-deep);}
+  .brand__tag{font-size:12px;color:var(--text-muted);letter-spacing:.04em;text-transform:uppercase;padding-left:10px;margin-left:4px;border-left:1px solid var(--line-strong);}
+  .nav{display:flex;gap:2px;}
+  .nav a{
+    text-decoration:none;font-size:13px;font-weight:500;color:var(--text-secondary);
+    padding:7px 12px;border-radius:var(--r-full);transition:background .15s,color .15s;
+    white-space:nowrap;
+  }
+  .nav a:hover{background:var(--primary-tint);color:var(--primary-deep);}
+  .nav a.is-active{background:var(--primary);color:var(--on-primary);}
+  @media(max-width:860px){.nav{display:none;}.brand__tag{display:none;}}
+
+  main{max-width:1180px;margin:0 auto;padding:0 clamp(16px,4vw,32px);}
+
+  /* phase block */
+  .phase{padding:var(--s-xxl) 0;border-bottom:1px solid var(--line);}
+  .phase:last-child{border-bottom:0;}
+  .phase__head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:var(--s-lg);}
+  .phase__tag{
+    font-size:11.5px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;
+    color:var(--primary);background:var(--primary-tint);
+    padding:5px 11px;border-radius:var(--r-full);white-space:nowrap;
+  }
+  .phase__desc{font-size:14px;color:var(--text-muted);max-width:48ch;}
+
+  /* the "app screen" frame */
+  .screen{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);
+    box-shadow:var(--shadow-md);overflow:hidden;
+  }
+  .screen--narrow{max-width:var(--maxw);margin:0 auto;}
+
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    font-weight:600;font-size:15px;border-radius:var(--r-md);border:1px solid transparent;
+    padding:13px 22px;transition:transform .12s,background .15s,box-shadow .15s,border-color .15s;
+    text-decoration:none;
+  }
+  .btn:active{transform:translateY(1px);}
+  .btn--primary{background:var(--accent);color:var(--on-accent);box-shadow:0 2px 0 var(--accent-deep);}
+  .btn--primary:hover{background:var(--accent-deep);box-shadow:0 2px 0 #a8531f;}
+  .btn--teal{background:var(--primary);color:var(--on-primary);box-shadow:0 2px 0 var(--primary-deep);}
+  .btn--teal:hover{background:var(--primary-deep);box-shadow:0 2px 0 #073a30;}
+  .btn--secondary{background:var(--surface);color:var(--primary-deep);border-color:var(--line-strong);}
+  .btn--secondary:hover{border-color:var(--primary);background:var(--primary-tint);}
+  .btn--ghost{background:transparent;color:var(--primary-deep);padding:10px 14px;}
+  .btn--ghost:hover{background:var(--primary-tint);}
+  .btn--block{display:flex;width:100%;}
+  .btn--lg{padding:16px 28px;font-size:16px;}
+
+  .link{color:var(--primary-deep);font-weight:500;text-decoration:none;border-bottom:1px solid var(--primary-tint-2);padding-bottom:1px;}
+  .link:hover{border-bottom-color:var(--primary);}
+
+  /* ============================================================
+     PHASE 1 — Intake
+     ============================================================ */
+  .intake{position:relative;padding:clamp(40px,7vw,84px) clamp(20px,5vw,72px);text-align:center;overflow:hidden;background:linear-gradient(180deg,#FCFBF7 0%,#F4F1E9 100%);}
+  .intake__topo{position:absolute;inset:0;z-index:0;color:var(--primary);opacity:.10;pointer-events:none;}
+  .intake__inner{position:relative;z-index:1;max-width:560px;margin:0 auto;}
+  .intake__logo{width:64px;height:64px;margin:0 auto 22px;}
+  .intake h1{font-size:clamp(38px,6vw,58px);font-weight:600;letter-spacing:-.02em;color:var(--primary-deep);}
+  .intake__tagline{margin-top:10px;font-size:clamp(17px,2.4vw,20px);color:var(--text-secondary);font-weight:450;}
+  .intake__lbl{margin-top:38px;margin-bottom:14px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);font-weight:600;}
+  .langs{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;max-width:480px;margin:0 auto;}
+  .lang{
+    border:1px solid var(--line-strong);background:var(--surface);
+    border-radius:var(--r-full);padding:9px 16px;font-size:14px;font-weight:500;color:var(--text-secondary);
+    display:flex;align-items:center;gap:7px;transition:all .14s;line-height:1.2;
+  }
+  .lang small{font-size:11.5px;color:var(--text-muted);}
+  .lang:hover{border-color:var(--primary);color:var(--primary-deep);background:var(--primary-tint);}
+  .lang[aria-pressed="true"]{background:var(--primary);border-color:var(--primary);color:var(--on-primary);box-shadow:var(--shadow-sm);}
+  .lang[aria-pressed="true"] small{color:rgba(255,255,255,.75);}
+  .intake__cta{margin-top:30px;}
+  .trust{
+    margin-top:24px;display:inline-flex;align-items:center;gap:9px;
+    font-size:13px;color:var(--text-muted);background:var(--surface-2);
+    border:1px solid var(--line);padding:9px 16px;border-radius:var(--r-full);
+  }
+  .trust svg{flex:0 0 auto;color:var(--primary);}
+
+  /* ============================================================
+     PHASE 2 — Structured interview
+     ============================================================ */
+  .progress-rail{
+    display:flex;align-items:center;gap:6px;padding:18px clamp(18px,4vw,28px);
+    background:var(--surface-2);border-bottom:1px solid var(--line);flex-wrap:wrap;
+  }
+  .phase-pill{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-muted);font-weight:500;}
+  .phase-pill .dot{width:22px;height:22px;border-radius:var(--r-full);border:1.5px solid var(--line-strong);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--text-muted);background:var(--surface);}
+  .phase-pill.done .dot{background:var(--primary);border-color:var(--primary);color:#fff;}
+  .phase-pill.done{color:var(--text-secondary);}
+  .phase-pill.active .dot{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 0 0 4px var(--accent-tint);}
+  .phase-pill.active{color:var(--text);font-weight:600;}
+  .phase-sep{width:18px;height:1.5px;background:var(--line-strong);flex:0 0 auto;}
+  @media(max-width:620px){.phase-pill span.t{display:none;}.phase-sep{width:10px;}}
+
+  .chat{padding:clamp(18px,4vw,30px);display:flex;flex-direction:column;gap:18px;background:var(--surface);}
+  .msg{display:flex;gap:12px;max-width:88%;}
+  .msg__av{flex:0 0 auto;width:34px;height:34px;border-radius:var(--r-full);background:var(--primary);display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow-sm);}
+  .msg__bubble{padding:13px 16px;border-radius:14px;font-size:15px;line-height:1.55;}
+  .msg--agent .msg__bubble{background:var(--primary-tint);color:#15302a;border-bottom-left-radius:5px;}
+  .msg--user{margin-left:auto;flex-direction:row-reverse;}
+  .msg--user .msg__bubble{background:var(--accent-tint);color:#5c3415;border-bottom-right-radius:5px;}
+  .msg--user .msg__av{background:var(--accent);}
+  .msg--user .msg__av span{color:#fff;font-size:13px;font-weight:600;}
+  .msg--current .msg__bubble{background:var(--surface);border:1.5px solid var(--primary-tint-2);box-shadow:var(--shadow-sm);font-weight:500;color:var(--text);}
+
+  .thinking{display:inline-flex;align-items:center;gap:9px;font-size:13px;color:var(--text-muted);padding:2px 0 0 46px;}
+  .thinking .dots{display:inline-flex;gap:4px;}
+  .thinking .dots i{width:6px;height:6px;border-radius:50%;background:var(--primary);opacity:.4;animation:blink 1.2s infinite;}
+  .thinking .dots i:nth-child(2){animation-delay:.2s;}
+  .thinking .dots i:nth-child(3){animation-delay:.4s;}
+  @keyframes blink{0%,60%,100%{opacity:.25;transform:translateY(0);}30%{opacity:1;transform:translateY(-2px);}}
+
+  .responder{border-top:1px solid var(--line);background:var(--surface-2);padding:clamp(16px,4vw,24px);}
+  .responder__lbl{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-muted);font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .seg{display:inline-flex;background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--r-full);padding:3px;gap:2px;}
+  .seg button{border:0;background:transparent;font-size:12.5px;font-weight:600;color:var(--text-secondary);padding:6px 13px;border-radius:var(--r-full);transition:all .14s;letter-spacing:0;text-transform:none;}
+  .seg button[aria-selected="true"]{background:var(--primary);color:#fff;}
+  .seg button:hover:not([aria-selected="true"]){background:var(--primary-tint);color:var(--primary-deep);}
+
+  .mode{display:none;}
+  .mode.is-on{display:block;animation:fadeUp .25s ease;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+
+  .choices{display:flex;flex-wrap:wrap;gap:10px;}
+  .choice{
+    border:1px solid var(--line-strong);background:var(--surface);border-radius:var(--r-full);
+    padding:10px 16px;font-size:14px;font-weight:500;color:var(--text-secondary);transition:all .14s;
+  }
+  .choice:hover{border-color:var(--primary);color:var(--primary-deep);background:var(--primary-tint);}
+  .choice[aria-pressed="true"]{background:var(--primary);border-color:var(--primary);color:#fff;box-shadow:var(--shadow-sm);}
+  .choice[aria-pressed="true"]::before{content:"✓ ";font-weight:700;}
+
+  .country-field{position:relative;max-width:420px;}
+  .country-input{
+    width:100%;padding:13px 16px 13px 42px;font-size:15px;font-family:inherit;color:var(--text);
+    border:1.5px solid var(--primary-tint-2);border-radius:var(--r-md);background:var(--surface);
+  }
+  .country-input:focus{outline:0;border-color:var(--primary);box-shadow:0 0 0 4px var(--primary-tint);}
+  .country-field .pin{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--text-muted);}
+  .country-menu{
+    margin-top:6px;border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--surface);
+    box-shadow:var(--shadow-lg);overflow:hidden;max-width:420px;
+  }
+  .country-menu button{
+    display:flex;width:100%;align-items:center;gap:11px;border:0;background:transparent;
+    padding:11px 16px;font-size:14.5px;color:var(--text);text-align:left;border-bottom:1px solid var(--line);
+  }
+  .country-menu button:last-child{border-bottom:0;}
+  .country-menu button:hover,.country-menu button.hl{background:var(--primary-tint);}
+  .country-menu .flag{font-size:18px;}
+  .country-menu .muted{margin-left:auto;font-size:12px;color:var(--text-muted);}
+
+  .freetext{width:100%;min-height:96px;padding:14px 16px;font-size:15px;font-family:inherit;line-height:1.6;color:var(--text);border:1.5px solid var(--primary-tint-2);border-radius:var(--r-md);background:var(--surface);resize:vertical;}
+  .freetext:focus{outline:0;border-color:var(--primary);box-shadow:0 0 0 4px var(--primary-tint);}
+  .freetext::placeholder{color:var(--text-muted);}
+
+  .responder__foot{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:16px;flex-wrap:wrap;}
+
+  /* ============================================================
+     PHASE 3 — Assessment
+     ============================================================ */
+  .assess{display:grid;grid-template-columns:300px 1fr;}
+  @media(max-width:760px){.assess{grid-template-columns:1fr;}}
+  .assess__facts{background:var(--surface-2);border-right:1px solid var(--line);padding:clamp(18px,4vw,26px);}
+  @media(max-width:760px){.assess__facts{border-right:0;border-bottom:1px solid var(--line);}}
+  .assess__facts h3{font-size:15px;font-family:"Inter";font-weight:700;margin-bottom:16px;color:var(--text);}
+  .fact{padding:12px 0;border-bottom:1px solid var(--line);}
+  .fact:last-child{border-bottom:0;}
+  .fact dt{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);font-weight:600;margin-bottom:3px;}
+  .fact dd{margin:0;font-size:14.5px;color:var(--text);font-weight:500;}
+  .chip{display:inline-block;background:var(--primary-tint);color:var(--primary-deep);font-size:12px;font-weight:600;padding:3px 9px;border-radius:var(--r-full);margin:2px 4px 2px 0;}
+
+  .assess__reason{padding:clamp(18px,4vw,28px);background:var(--surface);position:relative;}
+  .assess__bar{margin-bottom:20px;}
+  .assess__bar .row{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:var(--text-secondary);margin-bottom:8px;}
+  .assess__bar .row b{color:var(--text);font-weight:600;}
+  .track{height:8px;border-radius:var(--r-full);background:var(--primary-tint-2);overflow:hidden;}
+  .track > i{display:block;height:100%;width:0;border-radius:var(--r-full);background:linear-gradient(90deg,var(--primary),var(--secondary));transition:width 2.4s cubic-bezier(.4,0,.1,1);}
+  .reason-doc{font-size:14.5px;line-height:1.75;color:var(--text-secondary);font-feature-settings:"liga" 1;}
+  .reason-doc .ln{display:block;opacity:0;transform:translateY(4px);transition:opacity .4s,transform .4s;margin-bottom:8px;padding-left:18px;position:relative;}
+  .reason-doc .ln::before{content:"";position:absolute;left:0;top:9px;width:7px;height:7px;border-radius:50%;background:var(--primary);opacity:.5;}
+  .reason-doc .ln.show{opacity:1;transform:none;}
+  .reason-doc .ln strong{color:var(--text);font-weight:600;}
+  .reason-doc .ln.concl::before{background:var(--success);opacity:1;}
+  .reason-cursor{display:inline-block;width:9px;height:18px;background:var(--primary);vertical-align:-3px;margin-left:2px;animation:caret 1s steps(1) infinite;}
+  @keyframes caret{50%{opacity:0;}}
+
+  /* ============================================================
+     PHASE 4 — Recommendations
+     ============================================================ */
+  .reco{padding:clamp(18px,4vw,30px);background:var(--surface);}
+  .reco__intro{max-width:60ch;color:var(--text-secondary);font-size:15px;margin-bottom:22px;}
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+  @media(max-width:820px){.cards{grid-template-columns:1fr;}}
+  .ccard{border:1.5px solid var(--line);border-radius:var(--r-lg);background:var(--surface-2);padding:20px;display:flex;flex-direction:column;gap:14px;transition:border-color .15s,box-shadow .15s,transform .15s;}
+  .ccard:hover{border-color:var(--primary-tint-2);box-shadow:var(--shadow-md);}
+  .ccard.is-selected{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-tint),var(--shadow-md);background:var(--surface);}
+  .ccard__top{display:flex;align-items:center;gap:11px;}
+  .ccard__flag{font-size:30px;line-height:1;}
+  .ccard__name{font-family:"Fraunces";font-weight:600;font-size:21px;color:var(--text);}
+  .badge{font-size:11.5px;font-weight:700;letter-spacing:.03em;padding:4px 10px;border-radius:var(--r-full);text-transform:uppercase;}
+  .badge--strong{background:var(--success-tint);color:#1d6b41;}
+  .badge--moderate{background:var(--warning-tint);color:#8a6414;}
+  .ccard__facts{display:flex;flex-direction:column;gap:9px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:14px 0;}
+  .ccard__facts .f{display:flex;justify-content:space-between;gap:10px;font-size:13.5px;}
+  .ccard__facts .f span{color:var(--text-muted);}
+  .ccard__facts .f b{color:var(--text);font-weight:600;text-align:right;}
+  details.prep{border-top:0;}
+  details.prep summary{list-style:none;cursor:pointer;font-size:13.5px;font-weight:600;color:var(--primary-deep);display:flex;align-items:center;gap:7px;padding:2px 0;}
+  details.prep summary::-webkit-details-marker{display:none;}
+  details.prep summary .caret{transition:transform .2s;color:var(--primary);}
+  details.prep[open] summary .caret{transform:rotate(90deg);}
+  details.prep ul{margin:11px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px;}
+  details.prep li{font-size:13.5px;color:var(--text-secondary);display:flex;gap:9px;line-height:1.45;}
+  details.prep li::before{content:"";flex:0 0 auto;width:6px;height:6px;border-radius:50%;background:var(--accent);margin-top:7px;}
+  .ccard .btn{margin-top:auto;}
+
+  .roadmap{margin-top:30px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-lg);padding:clamp(18px,4vw,26px);}
+  .roadmap__head{display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap;}
+  .roadmap__head h3{font-size:18px;}
+  .roadmap__head .for{font-size:13px;color:var(--text-muted);}
+  .roadmap__head .for b{color:var(--primary-deep);}
+  .steps{display:flex;flex-direction:column;}
+  .step{display:grid;grid-template-columns:42px 1fr;gap:16px;position:relative;padding-bottom:22px;}
+  .step:last-child{padding-bottom:0;}
+  .step__num{position:relative;z-index:1;width:42px;height:42px;border-radius:var(--r-full);background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;box-shadow:var(--shadow-sm);}
+  .step:not(:last-child)::before{content:"";position:absolute;left:20px;top:42px;bottom:0;width:2px;background:var(--primary-tint-2);}
+  .step__body h4{font-family:"Inter";font-size:15.5px;font-weight:700;margin-bottom:4px;}
+  .step__body p{font-size:14px;color:var(--text-secondary);margin-bottom:7px;}
+  .step__meta{display:flex;gap:8px;flex-wrap:wrap;}
+  .tag-s{font-size:12px;font-weight:500;color:var(--text-secondary);background:var(--surface);border:1px solid var(--line);padding:3px 10px;border-radius:var(--r-full);display:inline-flex;align-items:center;gap:6px;}
+  .tag-s svg{color:var(--primary);}
+
+  /* ============================================================
+     PHASE 5 — Document package
+     ============================================================ */
+  .pkg{display:grid;grid-template-columns:1.1fr .9fr;gap:0;}
+  @media(max-width:820px){.pkg{grid-template-columns:1fr;}}
+  .pkg__preview{padding:clamp(18px,4vw,28px);border-right:1px solid var(--line);background:var(--surface-2);}
+  @media(max-width:820px){.pkg__preview{border-right:0;border-bottom:1px solid var(--line);}}
+  .pkg__side{padding:clamp(18px,4vw,28px);background:var(--surface);}
+  .pkg__lbl{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);font-weight:600;margin-bottom:12px;}
+  .doc{background:#fff;border:1px solid var(--line-strong);border-radius:var(--r-md);box-shadow:var(--shadow-sm);padding:26px 28px;max-height:340px;overflow:hidden;position:relative;}
+  .doc::after{content:"";position:absolute;left:0;right:0;bottom:0;height:70px;background:linear-gradient(180deg,rgba(255,255,255,0),#fff);}
+  .doc h4{font-family:"Fraunces";font-size:18px;font-weight:600;margin-bottom:2px;}
+  .doc .doc__sub{font-size:12px;color:var(--text-muted);margin-bottom:16px;letter-spacing:.02em;}
+  .doc p{font-size:13px;line-height:1.7;color:#33373f;margin-bottom:11px;}
+  .doc .fill{background:var(--accent-tint);color:#7a431a;padding:0 4px;border-radius:3px;font-weight:600;}
+  .doc__divider{height:1px;background:var(--line);margin:14px 0;}
+
+  .checklist{display:flex;flex-direction:column;gap:2px;margin-bottom:26px;}
+  .check{display:flex;align-items:flex-start;gap:12px;padding:11px 12px;border-radius:var(--r-md);cursor:pointer;transition:background .14s;}
+  .check:hover{background:var(--surface-2);}
+  .check input{position:absolute;opacity:0;width:0;height:0;}
+  .check .box{flex:0 0 auto;width:22px;height:22px;border-radius:6px;border:1.5px solid var(--line-strong);background:var(--surface);display:flex;align-items:center;justify-content:center;transition:all .14s;margin-top:1px;}
+  .check .box svg{opacity:0;transform:scale(.5);transition:all .14s;color:#fff;}
+  .check input:checked + .box{background:var(--success);border-color:var(--success);}
+  .check input:checked + .box svg{opacity:1;transform:scale(1);}
+  .check input:focus-visible + .box{outline:3px solid var(--accent);outline-offset:2px;}
+  .check__txt{font-size:14.5px;color:var(--text);line-height:1.4;}
+  .check input:checked ~ .check__txt{color:var(--text-muted);text-decoration:line-through;text-decoration-color:var(--line-strong);}
+  .check__txt small{display:block;font-size:12.5px;color:var(--text-muted);text-decoration:none;font-weight:400;}
+
+  .files{display:flex;flex-direction:column;gap:10px;margin-bottom:18px;}
+  .file{display:flex;align-items:center;gap:13px;border:1px solid var(--line);border-radius:var(--r-md);padding:13px 14px;background:var(--surface);transition:border-color .14s,box-shadow .14s;}
+  .file:hover{border-color:var(--primary-tint-2);box-shadow:var(--shadow-sm);}
+  .file__ic{flex:0 0 auto;width:38px;height:38px;border-radius:var(--r-md);background:var(--primary-tint);display:flex;align-items:center;justify-content:center;color:var(--primary-deep);}
+  .file__meta{min-width:0;}
+  .file__meta b{display:block;font-size:14px;font-weight:600;color:var(--text);}
+  .file__meta span{font-size:12px;color:var(--text-muted);}
+  .file__dl{margin-left:auto;flex:0 0 auto;width:38px;height:38px;border-radius:var(--r-md);border:1px solid var(--line);background:var(--surface);display:flex;align-items:center;justify-content:center;color:var(--primary-deep);transition:all .14s;}
+  .file__dl:hover{background:var(--primary);color:#fff;border-color:var(--primary);}
+  .pkg__actions{display:flex;flex-direction:column;gap:10px;margin-top:8px;}
+  .pkg__sub{display:flex;gap:14px;align-items:center;justify-content:center;margin-top:4px;flex-wrap:wrap;}
+
+  .footer{padding:40px 0 64px;text-align:center;color:var(--text-muted);font-size:13px;}
+  .footer .brand__name{font-size:16px;}
+
+  .visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
+</style>
+</head>
+<body>
+
+<!-- ===== Site bar ===== -->
+<header class="site-bar">
+  <div class="site-bar__inner">
+    <a class="brand" href="#top">
+      <span class="brand__mark" aria-hidden="true">
+        <svg width="30" height="30" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="15" fill="#0E6A58"/><path d="M16 7l7 6.5V25h-4.6v-6.2h-4.8V25H9V13.5L16 7z" fill="#fff"/><circle cx="16" cy="13.6" r="1.7" fill="#E07B39"/></svg>
+      </span>
+      <span class="brand__name">Refuge</span>
+      <span class="brand__tag">Design Walkthrough</span>
+    </a>
+    <nav class="nav" aria-label="Phases">
+      <a href="#phase-1">Intake</a>
+      <a href="#phase-2">Interview</a>
+      <a href="#phase-3">Assessment</a>
+      <a href="#phase-4">Recommendations</a>
+      <a href="#phase-5">Documents</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- ============== PHASE 1 — INTAKE ============== -->
+  <section class="phase" id="phase-1">
+    <div class="phase__head">
+      <span class="phase__tag">Phase 1 — Intake</span>
+      <span class="phase__desc">A calm welcome. The person chooses a language they trust before anything else is asked.</span>
+    </div>
+
+    <div class="screen screen--narrow">
+      <section class="intake" aria-label="Welcome">
+        <svg class="intake__topo" viewBox="0 0 780 520" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+          <g fill="none" stroke="currentColor" stroke-width="1.4">
+            <path d="M-20 120 C 160 70 260 180 420 150 C 560 124 660 60 820 110"/>
+            <path d="M-20 180 C 150 130 280 240 430 205 C 580 172 680 120 820 168"/>
+            <path d="M-20 250 C 170 196 270 300 440 268 C 600 238 690 188 820 232"/>
+            <path d="M-20 330 C 160 270 300 372 450 338 C 610 304 700 250 820 300"/>
+            <path d="M-20 414 C 180 350 290 446 450 416 C 610 388 710 330 820 380"/>
+          </g>
+          <g stroke="#E07B39" stroke-width="2" stroke-dasharray="2 9" stroke-linecap="round" fill="none" opacity="1">
+            <path d="M120 470 C 240 360 360 420 470 300 C 560 200 640 220 700 120"/>
+          </g>
+          <circle cx="120" cy="470" r="5" fill="#E07B39"/>
+          <circle cx="700" cy="120" r="6" fill="#0E6A58"/>
+        </svg>
+
+        <div class="intake__inner">
+          <div class="intake__logo" aria-hidden="true">
+            <svg width="64" height="64" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="15.5" fill="#0E6A58"/><circle cx="16" cy="16" r="15.5" stroke="#0A5042"/><path d="M16 7l7 6.5V25h-4.6v-6.2h-4.8V25H9V13.5L16 7z" fill="#fff"/><circle cx="16" cy="13.6" r="1.7" fill="#E07B39"/></svg>
+          </div>
+          <h1>Refuge</h1>
+          <p class="intake__tagline">Safe guidance for people on the move</p>
+
+          <p class="intake__lbl">Choose your language</p>
+          <div class="langs" role="group" aria-label="Select language">
+            <button class="lang" aria-pressed="true" data-lang="English">English</button>
+            <button class="lang" aria-pressed="false" data-lang="French">Français <small>French</small></button>
+            <button class="lang" aria-pressed="false" data-lang="Arabic">العربية <small>Arabic</small></button>
+            <button class="lang" aria-pressed="false" data-lang="Swahili">Kiswahili <small>Swahili</small></button>
+            <button class="lang" aria-pressed="false" data-lang="Amharic">አማርኛ <small>Amharic</small></button>
+            <button class="lang" aria-pressed="false" data-lang="Somali">Soomaali <small>Somali</small></button>
+            <button class="lang" aria-pressed="false" data-lang="Hausa">Hausa</button>
+            <button class="lang" aria-pressed="false" data-lang="Portuguese">Português <small>Portuguese</small></button>
+          </div>
+
+          <div class="intake__cta">
+            <button class="btn btn--primary btn--lg" id="beginBtn">Begin in English</button>
+          </div>
+
+          <div class="trust">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+            This conversation is private. Nothing is stored without your consent.
+          </div>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <!-- ============== PHASE 2 — INTERVIEW ============== -->
+  <section class="phase" id="phase-2">
+    <div class="phase__head">
+      <span class="phase__tag">Phase 2 — Structured Interview</span>
+      <span class="phase__desc">A multi-turn conversation. The agent asks one question at a time and offers the right kind of answer control for each.</span>
+    </div>
+
+    <div class="screen screen--narrow">
+      <!-- progress -->
+      <div class="progress-rail" aria-label="Interview progress">
+        <div class="phase-pill done"><span class="dot">✓</span><span class="t">Intake</span></div>
+        <span class="phase-sep"></span>
+        <div class="phase-pill active" aria-current="step"><span class="dot">2</span><span class="t">Situation</span></div>
+        <span class="phase-sep"></span>
+        <div class="phase-pill"><span class="dot">3</span><span class="t">History</span></div>
+        <span class="phase-sep"></span>
+        <div class="phase-pill"><span class="dot">4</span><span class="t">Goals</span></div>
+        <span class="phase-sep"></span>
+        <div class="phase-pill"><span class="dot">5</span><span class="t">Review</span></div>
+      </div>
+
+      <!-- chat -->
+      <div class="chat">
+        <div class="msg msg--agent">
+          <div class="msg__av" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 32 32"><path d="M16 7l7 6.5V25h-4.6v-6.2h-4.8V25H9V13.5L16 7z" fill="#fff"/></svg></div>
+          <div class="msg__bubble">What country are you currently in, and what country are you originally from?</div>
+        </div>
+        <div class="msg msg--user">
+          <div class="msg__av" aria-hidden="true"><span>You</span></div>
+          <div class="msg__bubble">I am in Sudan. I am from Ethiopia.</div>
+        </div>
+        <div class="msg msg--agent">
+          <div class="msg__av" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 32 32"><path d="M16 7l7 6.5V25h-4.6v-6.2h-4.8V25H9V13.5L16 7z" fill="#fff"/></svg></div>
+          <div class="msg__bubble">Thank you. Are you currently in immediate danger where you are now?</div>
+        </div>
+        <div class="msg msg--user">
+          <div class="msg__av" aria-hidden="true"><span>You</span></div>
+          <div class="msg__bubble">Yes, I had to leave my village.</div>
+        </div>
+        <div class="msg msg--agent msg--current">
+          <div class="msg__av" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 32 32"><path d="M16 7l7 6.5V25h-4.6v-6.2h-4.8V25H9V13.5L16 7z" fill="#fff"/></svg></div>
+          <div class="msg__bubble">I understand, and I'm sorry you've had to go through this. I want to be sure I understand your situation fully. <strong>What is the primary reason you had to leave your home?</strong></div>
+        </div>
+        <div class="thinking" aria-live="polite"><span class="dots"><i></i><i></i><i></i></span> Refuge is listening</div>
+      </div>
+
+      <!-- structured responder -->
+      <div class="responder">
+        <div class="responder__lbl">
+          Your answer
+          <div class="seg" role="tablist" aria-label="Response mode">
+            <button role="tab" aria-selected="true" data-mode="choice">Choice</button>
+            <button role="tab" aria-selected="false" data-mode="country">Country</button>
+            <button role="tab" aria-selected="false" data-mode="text">Free text</button>
+          </div>
+        </div>
+
+        <!-- choice -->
+        <div class="mode is-on" data-pane="choice">
+          <div class="choices" role="group" aria-label="Primary reason">
+            <button class="choice" aria-pressed="true">Political</button>
+            <button class="choice" aria-pressed="false">Ethnic</button>
+            <button class="choice" aria-pressed="false">Religious</button>
+            <button class="choice" aria-pressed="false">Gender-based</button>
+            <button class="choice" aria-pressed="false">Sexual orientation</button>
+            <button class="choice" aria-pressed="false">Climate displacement</button>
+            <button class="choice" aria-pressed="false">Other</button>
+          </div>
+        </div>
+
+        <!-- country -->
+        <div class="mode" data-pane="country">
+          <div class="country-field">
+            <span class="pin" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
+            <input class="country-input" type="text" value="Eth" aria-label="Country of origin" aria-expanded="true" aria-autocomplete="list" />
+          </div>
+          <div class="country-menu" role="listbox" aria-label="Matching countries">
+            <button role="option" class="hl"><span class="flag">🇪🇹</span> Ethiopia <span class="muted">Origin</span></button>
+            <button role="option"><span class="flag">🇪🇷</span> Eritrea</button>
+            <button role="option"><span class="flag">🇸🇿</span> Eswatini</button>
+          </div>
+        </div>
+
+        <!-- text -->
+        <div class="mode" data-pane="text">
+          <textarea class="freetext" placeholder="Take your time. You can write in any language — Refuge will understand. Describe what happened in your own words.">In November, armed men came to our village. They were looking for people connected to the opposition. My husband was taken and we have not heard from him since.</textarea>
+        </div>
+
+        <div class="responder__foot">
+          <a href="#" class="btn btn--ghost" onclick="return false;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+            Save and continue later
+          </a>
+          <button class="btn btn--teal">Continue →</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== PHASE 3 — ASSESSMENT ============== -->
+  <section class="phase" id="phase-3">
+    <div class="phase__head">
+      <span class="phase__tag">Phase 3 — Situation Assessment</span>
+      <span class="phase__desc">The agent's reasoning is shown, not hidden. The person can watch a thoughtful case being worked through.</span>
+    </div>
+
+    <div class="screen">
+      <div class="assess">
+        <aside class="assess__facts" aria-label="Collected facts">
+          <h3>What you've shared</h3>
+          <dl style="margin:0;">
+            <div class="fact"><dt>Country of origin</dt><dd>🇪🇹 Ethiopia</dd></div>
+            <div class="fact"><dt>Current location</dt><dd>🇸🇩 Sudan — Gedaref region</dd></div>
+            <div class="fact"><dt>Reason for leaving</dt><dd><span class="chip">Political</span><span class="chip">Ethnic</span></dd></div>
+            <div class="fact"><dt>Family situation</dt><dd>Traveling with 2 children</dd></div>
+            <div class="fact"><dt>Languages</dt><dd>Amharic, Arabic (basic)</dd></div>
+            <div class="fact"><dt>Destination preference</dt><dd>Nearest safe country with open asylum</dd></div>
+          </dl>
+        </aside>
+
+        <div class="assess__reason">
+          <div class="assess__bar">
+            <div class="row"><span>Assessing your case…</span><b id="assessPct">60%</b></div>
+            <div class="track"><i id="assessTrack" data-w="60%"></i></div>
+          </div>
+          <div class="reason-doc" id="reasonDoc" aria-live="polite">
+            <span class="ln">Reviewing situation against <strong>1951 Refugee Convention</strong> criteria…</span>
+            <span class="ln">Checking <strong>AU Refugee Convention</strong> (1969) — broader protection scope for conflict displacement…</span>
+            <span class="ln">Ethiopia → Sudan movement: crossing from an <strong>active conflict zone</strong>; UNHCR presence in Sudan confirmed…</span>
+            <span class="ln">Persecution type: <strong>political + ethnic</strong> — strong, well-founded Convention grounds…</span>
+            <span class="ln">Family unit of three, including minors — flagging <strong>child-protection</strong> and family-unity provisions…</span>
+            <span class="ln">Assessing nearest safe countries with <strong>open asylum programs</strong> and active UNHCR registration…</span>
+            <span class="ln concl">Provisional finding: <strong>credible claim under both Conventions.</strong> Preparing country options.<span class="reason-cursor" aria-hidden="true"></span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== PHASE 4 — RECOMMENDATIONS ============== -->
+  <section class="phase" id="phase-4">
+    <div class="phase__head">
+      <span class="phase__tag">Phase 4 — Recommendations &amp; Action Plan</span>
+      <span class="phase__desc">Clear options, ranked and explained — followed by a concrete, step-by-step roadmap for the country you choose.</span>
+    </div>
+
+    <div class="screen">
+      <div class="reco">
+        <p class="reco__intro">Based on your situation, these are the safest and most achievable options near you. Each is matched to your profile — not a generic ranking.</p>
+
+        <div class="cards">
+          <!-- Kenya (selected) -->
+          <article class="ccard is-selected" data-country="Kenya">
+            <div class="ccard__top">
+              <span class="ccard__flag">🇰🇪</span>
+              <div>
+                <div class="ccard__name">Kenya</div>
+                <span class="badge badge--strong">Strong match</span>
+              </div>
+            </div>
+            <div class="ccard__facts">
+              <div class="f"><span>Processing time</span><b>8–14 months</b></div>
+              <div class="f"><span>UNHCR office</span><b>Yes — Nairobi</b></div>
+              <div class="f"><span>Acceptance (your profile)</span><b>High</b></div>
+              <div class="f"><span>Primary language</span><b>English, Swahili</b></div>
+            </div>
+            <details class="prep">
+              <summary><span class="caret">▸</span> What you need to prepare</summary>
+              <ul>
+                <li>Any identity document from Ethiopia (or a sworn statement if none)</li>
+                <li>Written personal statement — Refuge drafts this for you</li>
+                <li>Names &amp; ages of children traveling with you</li>
+                <li>Any evidence of the threat (photos, messages, witness names)</li>
+              </ul>
+            </details>
+            <button class="btn btn--teal btn--block">✓ Selected</button>
+          </article>
+
+          <!-- Uganda -->
+          <article class="ccard" data-country="Uganda">
+            <div class="ccard__top">
+              <span class="ccard__flag">🇺🇬</span>
+              <div>
+                <div class="ccard__name">Uganda</div>
+                <span class="badge badge--strong">Strong match</span>
+              </div>
+            </div>
+            <div class="ccard__facts">
+              <div class="f"><span>Processing time</span><b>6–12 months</b></div>
+              <div class="f"><span>UNHCR office</span><b>Yes — Kampala</b></div>
+              <div class="f"><span>Acceptance (your profile)</span><b>High</b></div>
+              <div class="f"><span>Primary language</span><b>English</b></div>
+            </div>
+            <details class="prep">
+              <summary><span class="caret">▸</span> What you need to prepare</summary>
+              <ul>
+                <li>Registration at a reception centre on arrival</li>
+                <li>Personal statement and family details</li>
+                <li>Open settlement policy — right to work and move</li>
+              </ul>
+            </details>
+            <button class="btn btn--secondary btn--block">Select this country</button>
+          </article>
+
+          <!-- Egypt -->
+          <article class="ccard" data-country="Egypt">
+            <div class="ccard__top">
+              <span class="ccard__flag">🇪🇬</span>
+              <div>
+                <div class="ccard__name">Egypt</div>
+                <span class="badge badge--moderate">Moderate match</span>
+              </div>
+            </div>
+            <div class="ccard__facts">
+              <div class="f"><span>Processing time</span><b>12–24 months</b></div>
+              <div class="f"><span>UNHCR office</span><b>Yes — Cairo</b></div>
+              <div class="f"><span>Acceptance (your profile)</span><b>Moderate</b></div>
+              <div class="f"><span>Primary language</span><b>Arabic</b></div>
+            </div>
+            <details class="prep">
+              <summary><span class="caret">▸</span> What you need to prepare</summary>
+              <ul>
+                <li>UNHCR registration — longer waiting list</li>
+                <li>Proof of journey and entry details</li>
+                <li>Arabic is helpful for daily life and services</li>
+              </ul>
+            </details>
+            <button class="btn btn--secondary btn--block">Select this country</button>
+          </article>
+        </div>
+
+        <!-- roadmap -->
+        <div class="roadmap">
+          <div class="roadmap__head">
+            <h3>Your roadmap</h3>
+            <span class="for">for <b>🇰🇪 Kenya</b> · updates if you choose another country</span>
+          </div>
+          <div class="steps">
+            <div class="step">
+              <div class="step__num">1</div>
+              <div class="step__body">
+                <h4>Register with UNHCR</h4>
+                <p>Get a registration appointment and an asylum-seeker certificate, which protects you from being returned.</p>
+                <div class="step__meta">
+                  <span class="tag-s"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> UNHCR Nairobi · Shauri Moyo</span>
+                  <span class="tag-s">⏱ 1–4 weeks for appointment</span>
+                </div>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step__num">2</div>
+              <div class="step__body">
+                <h4>File your asylum claim</h4>
+                <p>Submit your personal statement and supporting evidence. Refuge has already drafted these for you.</p>
+                <div class="step__meta">
+                  <span class="tag-s">RSD unit, Dept. of Refugee Services</span>
+                  <span class="tag-s">⏱ Same week as registration</span>
+                </div>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step__num">3</div>
+              <div class="step__body">
+                <h4>Refugee status interview (RSD)</h4>
+                <p>A protection officer hears your account. Free legal aid can prepare and accompany you.</p>
+                <div class="step__meta">
+                  <span class="tag-s">RefuPoint / Kituo Cha Sheria (legal aid)</span>
+                  <span class="tag-s">⏱ 3–9 months after filing</span>
+                </div>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step__num">4</div>
+              <div class="step__body">
+                <h4>Decision</h4>
+                <p>If recognized, you receive refugee status and a mandate certificate. If not, you have the right to appeal.</p>
+                <div class="step__meta">
+                  <span class="tag-s">Written decision · appeal possible</span>
+                  <span class="tag-s">⏱ 8–14 months total</span>
+                </div>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step__num">5</div>
+              <div class="step__body">
+                <h4>Integration support</h4>
+                <p>Access schooling for your children, healthcare, and the right to work or resettlement referral.</p>
+                <div class="step__meta">
+                  <span class="tag-s">UNHCR partners · community orgs</span>
+                  <span class="tag-s">⏱ Ongoing</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== PHASE 5 — DOCUMENTS ============== -->
+  <section class="phase" id="phase-5">
+    <div class="phase__head">
+      <span class="phase__tag">Phase 5 — Document Package</span>
+      <span class="phase__desc">Everything gathered into a package the person can download, print, and carry — pre-filled and ready.</span>
+    </div>
+
+    <div class="screen">
+      <div class="pkg">
+        <!-- preview -->
+        <div class="pkg__preview">
+          <p class="pkg__lbl">Preview · Personal statement</p>
+          <article class="doc">
+            <h4>Personal Statement</h4>
+            <p class="doc__sub">In support of an application for refugee status · Prepared with Refuge</p>
+            <p>My name is <span class="fill">[full name]</span>. I am a national of <span class="fill">Ethiopia</span>, born in <span class="fill">[town]</span>. I am currently in <span class="fill">Gedaref, Sudan</span>, traveling with my <span class="fill">two children</span>.</p>
+            <div class="doc__divider"></div>
+            <p>I left my home because of <span class="fill">political and ethnic persecution</span>. In November, armed men came to our village searching for people connected to the opposition. My husband was taken and we have not heard from him since…</p>
+            <p>I fear that if I return I will be <span class="fill">detained or harmed</span> because of my family's perceived political affiliation and my ethnicity.</p>
+          </article>
+          <div class="pkg__sub" style="margin-top:18px;">
+            <a class="link" href="#" onclick="return false;">Edit statement</a>
+            <span style="color:var(--line-strong);">·</span>
+            <a class="link" href="#" onclick="return false;">Translate to English</a>
+          </div>
+        </div>
+
+        <!-- side -->
+        <div class="pkg__side">
+          <p class="pkg__lbl">Evidence to gather</p>
+          <div class="checklist">
+            <label class="check">
+              <input type="checkbox" checked />
+              <span class="box"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+              <span class="check__txt">Personal statement <small>Drafted by Refuge · ready</small></span>
+            </label>
+            <label class="check">
+              <input type="checkbox" checked />
+              <span class="box"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+              <span class="check__txt">Identity document or sworn statement <small>Photo of national ID added</small></span>
+            </label>
+            <label class="check">
+              <input type="checkbox" />
+              <span class="box"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+              <span class="check__txt">Photos or messages showing the threat <small>Optional, but strengthens your claim</small></span>
+            </label>
+            <label class="check">
+              <input type="checkbox" />
+              <span class="box"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+              <span class="check__txt">Names of witnesses who can confirm events <small>Two contacts suggested</small></span>
+            </label>
+          </div>
+
+          <p class="pkg__lbl">Your files</p>
+          <div class="files">
+            <div class="file">
+              <span class="file__ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg></span>
+              <div class="file__meta"><b>Personal statement (pre-filled)</b><span>PDF · 2 pages · English + Amharic</span></div>
+              <a href="#" class="file__dl" aria-label="Download personal statement" onclick="return false;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg></a>
+            </div>
+            <div class="file">
+              <span class="file__ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+              <div class="file__meta"><b>Kenya action plan</b><span>PDF · 5-step roadmap with contacts</span></div>
+              <a href="#" class="file__dl" aria-label="Download action plan" onclick="return false;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg></a>
+            </div>
+            <div class="file">
+              <span class="file__ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>
+              <div class="file__meta"><b>Emergency contacts</b><span>UNHCR offices &amp; legal aid · Sudan + Kenya</span></div>
+              <a href="#" class="file__dl" aria-label="Download contacts" onclick="return false;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg></a>
+            </div>
+            <div class="file">
+              <span class="file__ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+              <div class="file__meta"><b>Your rights — summary card</b><span>Wallet-size · non-refoulement &amp; key protections</span></div>
+              <a href="#" class="file__dl" aria-label="Download rights card" onclick="return false;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg></a>
+            </div>
+          </div>
+
+          <div class="pkg__actions">
+            <button class="btn btn--primary btn--block btn--lg">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
+              Download all (4 files)
+            </button>
+            <div class="pkg__sub">
+              <a class="link" href="#" onclick="window.print();return false;">Print-friendly version</a>
+              <span style="color:var(--line-strong);">·</span>
+              <a class="link" href="#" onclick="return false;">Start over for a different country</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="footer">
+    <span class="brand__name">Refuge</span> — Safe guidance for people on the move.<br />
+    Design walkthrough · all five phases · not a live application.
+  </div>
+</main>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---- Phase 1: language selection ---- */
+  var langs = document.querySelectorAll('.lang');
+  var beginBtn = document.getElementById('beginBtn');
+  langs.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      langs.forEach(function(b){ b.setAttribute('aria-pressed','false'); });
+      btn.setAttribute('aria-pressed','true');
+      beginBtn.textContent = 'Begin in ' + btn.getAttribute('data-lang');
+    });
+  });
+  beginBtn.addEventListener('click', function(){
+    document.getElementById('phase-2').scrollIntoView({behavior:'smooth', block:'start'});
+  });
+
+  /* ---- Phase 2: response mode tabs ---- */
+  var tabs = document.querySelectorAll('.seg [role="tab"]');
+  var panes = document.querySelectorAll('.mode');
+  tabs.forEach(function(tab){
+    tab.addEventListener('click', function(){
+      tabs.forEach(function(t){ t.setAttribute('aria-selected','false'); });
+      tab.setAttribute('aria-selected','true');
+      var mode = tab.getAttribute('data-mode');
+      panes.forEach(function(p){
+        p.classList.toggle('is-on', p.getAttribute('data-pane') === mode);
+      });
+    });
+  });
+
+  /* choice pills (single select) */
+  var choices = document.querySelectorAll('.choices .choice');
+  choices.forEach(function(c){
+    c.addEventListener('click', function(){
+      choices.forEach(function(x){ x.setAttribute('aria-pressed','false'); });
+      c.setAttribute('aria-pressed','true');
+    });
+  });
+
+  /* country menu select */
+  var countryInput = document.querySelector('.country-input');
+  document.querySelectorAll('.country-menu [role="option"]').forEach(function(opt){
+    opt.addEventListener('click', function(){
+      if(countryInput){ countryInput.value = opt.textContent.replace(/Origin/,'').trim(); }
+      document.querySelectorAll('.country-menu [role="option"]').forEach(function(o){ o.classList.remove('hl'); });
+      opt.classList.add('hl');
+    });
+  });
+
+  /* ---- Phase 4: country card selection ---- */
+  var cards = document.querySelectorAll('.ccard');
+  cards.forEach(function(card){
+    var btn = card.querySelector('.btn');
+    btn.addEventListener('click', function(){
+      cards.forEach(function(c){
+        c.classList.remove('is-selected');
+        var b = c.querySelector('.btn');
+        b.className = 'btn btn--secondary btn--block';
+        b.textContent = 'Select this country';
+      });
+      card.classList.add('is-selected');
+      btn.className = 'btn btn--teal btn--block';
+      btn.textContent = '✓ Selected';
+      var name = card.getAttribute('data-country');
+      var flagMap = {Kenya:'🇰🇪', Uganda:'🇺🇬', Egypt:'🇪🇬'};
+      var forEl = document.querySelector('.roadmap__head .for b');
+      if(forEl){ forEl.textContent = (flagMap[name]||'') + ' ' + name; }
+    });
+  });
+
+  /* ---- In-view animations: progress bar + reasoning stream ---- */
+  function runAssessment(){
+    var track = document.getElementById('assessTrack');
+    if(track){ track.style.width = track.getAttribute('data-w'); }
+    var lines = document.querySelectorAll('#reasonDoc .ln');
+    lines.forEach(function(ln, i){
+      setTimeout(function(){ ln.classList.add('show'); }, 350 + i*620);
+    });
+  }
+  var assessSection = document.getElementById('phase-3');
+  var assessRan = false;
+  if('IntersectionObserver' in window){
+    var obs = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if(e.isIntersecting && !assessRan){ assessRan = true; runAssessment(); }
+      });
+    }, {threshold:0.25});
+    obs.observe(assessSection);
+  } else {
+    runAssessment();
+  }
+
+  /* ---- Nav active state on scroll ---- */
+  var navLinks = document.querySelectorAll('.nav a');
+  var sections = [].map.call(navLinks, function(a){ return document.querySelector(a.getAttribute('href')); });
+  if('IntersectionObserver' in window){
+    var navObs = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if(e.isIntersecting){
+          var id = '#' + e.target.id;
+          navLinks.forEach(function(a){ a.classList.toggle('is-active', a.getAttribute('href') === id); });
+        }
+      });
+    }, {rootMargin:'-45% 0px -50% 0px'});
+    sections.forEach(function(s){ if(s) navObs.observe(s); });
+  }
+})();
+</script>
+</body>
+</html>

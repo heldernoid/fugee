@@ -1,0 +1,40 @@
+# .codex/config.toml — Codex CLI configuration for Refuge
+# Codex is the primary coding agent for this project.
+# This file configures attribution, approval gates, and agent context.
+
+model = "codex-1"
+
+# Commit attribution — required for hackathon Codex track eligibility.
+# Every commit Codex makes must carry this trailer.
+commit_attribution = "Co-authored-by: Codex <noreply@openai.com>"
+
+[context]
+# Files Codex reads at session start, in order.
+files = [
+  "AGENTS.md",
+  "CLAUDE.md",
+  "DESIGN.md",
+  "specs/ARCHITECTURE.md",
+  "specs/PLAN.md",
+  "specs/CHANGELOG.md",
+  "specs/data/README.md",
+]
+
+[approval]
+# Codex may read, write, and run tests without asking.
+# Destructive operations and shell commands outside test runners require approval.
+auto_approve   = ["read", "write", "test", "lint"]
+require_approval = ["delete", "shell_arbitrary", "git_push", "env_write"]
+
+[style]
+# Commit message format enforced by Codex.
+# Format: [T###] Imperative description (≤72 chars)
+# Body: what changed and why (optional, ≤500 chars)
+# Trailer: Co-authored-by line (required, blank line before it)
+commit_format = """
+[T{task_id}] {imperative_description}
+
+{optional_body}
+
+Co-authored-by: Codex <noreply@openai.com>
+"""

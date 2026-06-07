@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "refuge"
+version = "0.1.0"
+description = "Agentic AI assistant for displaced people, asylum seekers, and refugees."
+requires-python = ">=3.10"
+readme = "README.md"
+
+# Source lives in the `agent` and `app` top-level packages (no src/ layout).
+[tool.setuptools]
+packages = ["agent", "agent.tools", "app", "app.phases", "app.state"]
+
+[tool.pytest.ini_options]
+# Make the repo root importable so tests use absolute imports:
+#   from agent.loop import AgentLoop
+#   from app.state.session import SessionState
+pythonpath = ["."]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-ra"

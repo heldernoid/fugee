@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+dist/
+*.egg-info/
+
+# Node
+node_modules/
+agent/node_modules/
+
+# Generated documents (ephemeral)
+tmp/
+*.pdf
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+.pytest_cache/
+htmlcov/
+.coverage
+
+# UNHCR download artifacts (regenerate with data/scripts/unhcr_downloader.py)
+data/raw/*.json
+data/processed/*.json
+
+# Enriched countries file (regenerate with data/scripts/enrich_downloader.py)
+specs/data/countries_enriched.json
