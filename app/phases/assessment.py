@@ -20,13 +20,15 @@ from agent.loop import LoopHooks
 from agent.tools.asylum_stats import asylum_stats_tool
 from agent.tools.country_lookup import country_lookup_tool, lookup_country
 from agent.tools.guideline_search import guideline_search_tool
-from agent.tools.web_search import web_search_tool
 from app.assessment_parse import parse_assessment
 from app.phases.interview import advance_to
 from app.prompt_loader import compose
 from app.state.session import SessionState, State
 
-ASSESSMENT_TOOLS = [guideline_search_tool, country_lookup_tool, asylum_stats_tool, web_search_tool]
+# Web search is intentionally OFF: the assessment is grounded only in sources we
+# control — the curated country data (country_lookup / asylum_stats) and the
+# UNHCR guidelines (guideline_search) — so it can't surface unvetted web claims.
+ASSESSMENT_TOOLS = [guideline_search_tool, country_lookup_tool, asylum_stats_tool]
 
 # Facts shown in the left panel: (label, attribute, kind). Eight interview
 # fields (SC-030).
@@ -127,6 +129,40 @@ def render_progress(pct: int, status: str = "") -> str:
         f"<span>Assessing your case…</span><b>{pct}%</b></div>"
         f'<div class="track"><i style="width:{pct}%"></i></div>{chip}</div>'
     )
+
+
+_CASE_LABEL = {
+    "refugee": "a refugee claim under the 1951 Refugee Convention",
+    "broader_protection": "a claim for broader protection (e.g. fleeing conflict)",
+    "statelessness": "a statelessness case",
+    "economic_or_other": "mainly economic or other migration rather than a protection claim",
+    "unclear": "a case that needs more information to classify",
+}
+
+
+def _synth_reasoning(session: SessionState, result, recs: list[dict]) -> str:
+    """Readable fallback summary if the model returned only the structured block."""
+    iv = session.interview
+    lines = []
+    if iv.origin_country:
+        lines.append(f"Based on what you shared, you are from {iv.origin_country}"
+                     + (f" and are currently in {iv.current_country}" if iv.current_country else "") + ".")
+    if iv.free_text_history:
+        lines.append(f"You told me: {iv.free_text_history}")
+    ct = result.case_type or session.assessment.case_type
+    if ct:
+        lines.append(f"This appears to be {_CASE_LABEL.get(ct, ct)}.")
+    if result.grounds:
+        lines.append("Relevant ground(s): " + ", ".join(result.grounds) + ".")
+    if result.risk:
+        lines.append(f"Overall risk: {result.risk}.")
+    if recs:
+        names = ", ".join(r.get("country", "") for r in recs if r.get("country"))
+        if names:
+            lines.append(f"Realistic destinations to consider: {names}.")
+    if not lines:
+        lines.append("I could not complete a full assessment from the information provided.")
+    return "\n".join(lines)
 
 
 def _facts_summary(session: SessionState) -> str:
@@ -243,6 +279,10 @@ async def stream_assessment(session: SessionState, loop):
     if not recs:
         _collect(looked_up, recs, seen)
 
+    # Guarantee a readable reasoning even if the model skipped narration.
+    if len(visible.strip()) < 80:
+        visible = _synth_reasoning(session, result, recs)
+
     session.assessment.convention_grounds = result.grounds
     session.assessment.risk_level = result.risk
     session.assessment.case_type = result.case_type
@@ -250,7 +290,7 @@ async def stream_assessment(session: SessionState, loop):
     session.assessment.recommended_countries = recs
     advance_to(session, State.RECOMMENDATIONS)
 
-    yield render_facts(session), render_reason(acc), render_progress(100, "")
+    yield render_facts(session), render_reason(visible), render_progress(100, "")
 
 
 # --------------------------------------------------------------------------

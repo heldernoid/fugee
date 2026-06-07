@@ -73,6 +73,12 @@ eligibility — do not assume every person is a Convention refugee.**
 
 ## REQUIRED: final structured summary
 
+**Important:** First write your reasoning as a readable explanation the person can
+follow — several short plain-language sentences addressed to "you", covering the
+steps above and citing the guideline you relied on. This narrated reasoning is
+shown on screen and is required. Only AFTER it, append the structured block. Do
+NOT reply with the block alone.
+
 After your narrated reasoning, end your message with **exactly one** structured
 block, on its own lines, so the interface can build the recommendation cards:
 
