@@ -236,6 +236,7 @@ async def stream_assessment(session: SessionState, loop):
 
     session.assessment.convention_grounds = result.grounds
     session.assessment.risk_level = result.risk
+    session.assessment.case_type = result.case_type
     session.assessment.reasoning_trace = visible
     session.assessment.recommended_countries = recs
     advance_to(session, State.RECOMMENDATIONS)

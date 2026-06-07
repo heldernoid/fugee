@@ -14,8 +14,10 @@ import html
 
 import gradio as gr
 
+from agent.events import TextDeltaEvent
 from agent.loop import create_loop
 from app.countries import country_choices, country_name
+from app.prompt_loader import load_prompt
 from app.interview_script import (
     QUESTIONS,
     REVIEW_INDEX,
@@ -206,13 +208,52 @@ def _facts_recap(session: SessionState) -> str:
 
 
 def _agent_message_for(session: SessionState, idx: int, *, welcome: bool = False) -> str:
-    lang = session.language
-    if idx >= REVIEW_INDEX:
-        return f"{t(lang, 'review_intro')}\n{_facts_recap(session)}\n\n{t(lang, 'review_confirm')}"
-    text = question_text(lang, QUESTIONS[idx], session)
+    text = question_text(session.language, QUESTIONS[idx], session)
     if welcome:
-        return f"{t(lang, 'welcome')}\n{text}"
+        return f"{t(session.language, 'welcome')}\n{text}"
     return text
+
+
+def _labeled_facts(session: SessionState) -> str:
+    iv = session.interview
+    fields = [
+        ("Country of origin", iv.origin_country),
+        ("Current country", iv.current_country),
+        ("What happened", iv.free_text_history),
+        ("Immediate danger", None if iv.immediate_danger is None else ("yes" if iv.immediate_danger else "no")),
+        ("Time since leaving", iv.displacement_duration),
+        ("Documents", ", ".join(iv.documents_available) if iv.documents_available else None),
+        ("Languages", ", ".join(iv.languages_spoken) if iv.languages_spoken else None),
+        ("Preferred destination", ", ".join(iv.destination_preferences) if iv.destination_preferences else None),
+    ]
+    return "\n".join(f"{k}: {v}" for k, v in fields if v)
+
+
+def _labeled_fallback(session: SessionState) -> str:
+    lang = session.language
+    return f"{t(lang, 'review_intro')}\n{_labeled_facts(session)}\n\n{t(lang, 'review_confirm')}"
+
+
+async def _draft_review(session: SessionState, loop) -> str:
+    """LLM-written labeled review summary in the person's language."""
+    lang = session.language or "English"
+    system_prompt = (
+        load_prompt("system")
+        + f"\n\n# Right now\nIn {lang}, briefly summarise back what the person told you so they "
+        "can confirm. State each item on its own line, clearly labelled (country of origin, "
+        "current country, what happened, immediate danger, time since leaving, documents, "
+        "languages, preferred destination). Use ONLY the facts given — do not invent or omit. "
+        "End by asking, in one short sentence, whether it is correct."
+    )
+    acc = ""
+    try:
+        async for ev in loop.run("Facts:\n" + _labeled_facts(session), session=None,
+                                 system_prompt=system_prompt, thinking_level="off"):
+            if isinstance(ev, TextDeltaEvent):
+                acc += ev.delta
+    except Exception:
+        acc = ""
+    return acc.strip() or _labeled_fallback(session)
 
 
 # --------------------------------------------------------------------------
@@ -235,8 +276,13 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
             chat = gr.HTML(render_chat([]))
             with gr.Column(elem_id="iv-responder"):
                 lbl = gr.HTML('<div class="label-row">Your answer</div>')
-                radio = gr.Radio(choices=[], label="", show_label=False, visible=False, elem_id="iv-choice")
-                multi = gr.CheckboxGroup(choices=[], label="", show_label=False, visible=False, elem_id="iv-multi")
+                # Pre-mount with choices so they render immediately when shown
+                # (Gradio is laggy updating choices on a freshly-revealed control).
+                radio = gr.Radio(choices=["Yes", "No"], label="", show_label=False, visible=False, elem_id="iv-choice")
+                multi = gr.CheckboxGroup(
+                    choices=[t("English", oid) for q in QUESTIONS if q.control == "choice" for oid in q.options],
+                    label="", show_label=False, visible=False, elem_id="iv-multi",
+                )
                 country = gr.Dropdown(choices=country_choices(), label="", show_label=False, visible=False,
                                       allow_custom_value=True, filterable=True, elem_id="iv-country")
                 text = gr.Textbox(label="", show_label=False, lines=3, visible=False,
@@ -245,11 +291,15 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
 
     stream_outputs = [chat, rail, radio, multi, country, text, session_st, loop_st, slot_idx_st]
 
-    def _present(session, idx):
-        """Append the agent's (scripted) message and show its control."""
+    async def _present(session, loop, idx):
+        """Append the agent's message (scripted question, or LLM review summary)
+        and show the right control for the step."""
         target = State.REVIEW if idx >= REVIEW_INDEX else QUESTIONS[idx].phase
         advance_to(session, target)
-        msg = _agent_message_for(session, idx, welcome=(idx == 0))
+        if idx >= REVIEW_INDEX:
+            msg = await _draft_review(session, loop)
+        else:
+            msg = _agent_message_for(session, idx, welcome=(idx == 0))
         session.messages = list(session.messages) + [{"role": "assistant", "content": msg}]
         return (render_chat(session.messages), render_rail(session.state),
                 *control_updates(session, idx), session, idx)
@@ -258,18 +308,18 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
         if session is None:
             session = SessionState(); session.transition_to(State.INTAKE)
         loop = loop or create_loop()
-        out = _present(session, 0)
-        # yield (chat, rail, radio, multi, country, text, session, loop, idx)
+        out = await _present(session, loop, 0)
         yield (out[0], out[1], out[2], out[3], out[4], out[5], out[6], loop, out[7])
 
-    def on_continue(radio_v, multi_v, country_v, text_v, session, loop, idx):
+    async def on_continue(radio_v, multi_v, country_v, text_v, session, loop, idx):
         if session is None:
             session = SessionState(); session.transition_to(State.INTAKE)
-            o = _present(session, 0)
-            return (o[0], o[1], o[2], o[3], o[4], o[5], o[6], loop or create_loop(), o[7])
-
+            loop = loop or create_loop()
+            o = await _present(session, loop, 0)
+            return (o[0], o[1], o[2], o[3], o[4], o[5], o[6], loop, o[7])
+        loop = loop or create_loop()
         lang = session.language
-        # Review step
+
         if idx >= REVIEW_INDEX:
             if not radio_v:
                 return (gr.update(), gr.update(), *control_updates(session, idx), session, loop, idx)
@@ -279,8 +329,7 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
                 return (render_chat(session.messages), render_rail(session.state),
                         gr.update(visible=False), gr.update(visible=False),
                         gr.update(visible=False), gr.update(visible=False), session, loop, idx)
-            # "something needs changing" → start the questions over
-            o = _present(session, 0)
+            o = await _present(session, loop, 0)  # "something needs changing" → restart
             return (o[0], o[1], o[2], o[3], o[4], o[5], o[6], loop, o[7])
 
         q = QUESTIONS[idx]
@@ -288,7 +337,7 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
         if display is None:
             return (gr.update(), gr.update(), *control_updates(session, idx), session, loop, idx)
         session.messages = list(session.messages) + [{"role": "user", "content": display}]
-        o = _present(session, idx + 1)
+        o = await _present(session, loop, idx + 1)
         return (o[0], o[1], o[2], o[3], o[4], o[5], o[6], loop, o[7])
 
     continue_event = cont.click(

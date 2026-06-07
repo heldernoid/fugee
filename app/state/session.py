@@ -71,6 +71,7 @@ class Interview:
 class Assessment:
     convention_grounds: list[str] = field(default_factory=list)
     risk_level: Optional[str] = None  # "high" | "moderate" | "low"
+    case_type: Optional[str] = None   # refugee | broader_protection | statelessness | economic_or_other | unclear
     reasoning_trace: str = ""
     recommended_countries: list[dict] = field(default_factory=list)
 

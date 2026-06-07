@@ -21,6 +21,7 @@ class AssessmentResult:
     grounds: list[str] = field(default_factory=list)
     risk: str | None = None
     countries: list[str] = field(default_factory=list)
+    case_type: str | None = None
 
 
 def _split_list(value: str) -> list[str]:
@@ -67,6 +68,8 @@ def parse_assessment(text: str) -> tuple[str, AssessmentResult]:
             result.risk = risk if risk in _VALID_RISK else None
         elif key == "countries":
             result.countries = _split_list(value)
+        elif key == "case_type":
+            result.case_type = value.lower().replace(" ", "_") or None
 
     return visible, result
 
