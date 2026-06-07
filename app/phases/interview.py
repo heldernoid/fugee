@@ -36,6 +36,17 @@ RAIL = [
 # Internal first-turn instruction — never shown to the person or resent.
 BOOTSTRAP = "Please begin the interview now with your first question."
 
+
+def _bootstrap_for(session) -> str:
+    """First-turn instruction, asking the agent to greet in the chosen language."""
+    lang = getattr(session, "language", None)
+    if lang:
+        return (
+            f"The person has chosen to continue in {lang}. Greet them warmly and ask "
+            f"your first question in {lang}. {BOOTSTRAP}"
+        )
+    return BOOTSTRAP
+
 AGENT_AVATAR = (
     '<svg width="18" height="18" viewBox="0 0 32 32" aria-hidden="true">'
     '<path d="M16 7l7 6.5V25h-4.6v-6.2h-4.8V25H9V13.5L16 7z" fill="#fff"/></svg>'
@@ -221,13 +232,17 @@ class InterviewUI:
     stream_outputs: list
 
 
-def build() -> InterviewUI:
-    """Build the interview screen inside the current gr.Blocks context."""
+def build(visible: bool = True) -> InterviewUI:
+    """Build the interview screen inside the current gr.Blocks context.
+
+    ``visible`` starts the screen hidden when the intake screen precedes it
+    (Phase 2 navigation).
+    """
     session_st = gr.State(None)
     loop_st = gr.State(None)
     spec_st = gr.State(ResponderSpec())
 
-    with gr.Column(elem_id="iv-screen") as column:
+    with gr.Column(elem_id="iv-screen", visible=visible) as column:
         rail = gr.HTML(render_rail(State.SITUATION))
         chat = gr.HTML(render_chat([], thinking=True))
 
@@ -284,7 +299,8 @@ def build() -> InterviewUI:
             gr.update(visible=False), session, loop, ResponderSpec(),
         )
         spec = ResponderSpec()
-        async for chat_html, maybe_spec in _run_turn(BOOTSTRAP, session, loop):
+        boot = _bootstrap_for(session)
+        async for chat_html, maybe_spec in _run_turn(boot, session, loop):
             if maybe_spec is None:
                 yield (chat_html, render_rail(session.state), *(_NO_CHANGE * 4),
                        session, loop, gr.update())
@@ -293,7 +309,7 @@ def build() -> InterviewUI:
         # The bootstrap instruction is internal — never show or resend it.
         session.messages = [
             m for m in session.messages
-            if not (m.get("role") == "user" and m.get("content") == BOOTSTRAP)
+            if not (m.get("role") == "user" and m.get("content") == boot)
         ]
         r_up = responder_updates(spec)
         yield (render_chat(session.messages), render_rail(session.state), *r_up,

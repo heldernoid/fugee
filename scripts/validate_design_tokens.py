@@ -25,7 +25,12 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from app.design_tokens import load_tokens, root_css  # noqa: E402
 
-APP_PY = REPO_ROOT / "app" / "app.py"
+# Every Python module that injects CSS using var(--token) references.
+CSS_SOURCES = [
+    REPO_ROOT / "app" / "app.py",
+    REPO_ROOT / "app" / "phases" / "intake.py",
+    REPO_ROOT / "app" / "phases" / "interview.py",
+]
 
 _ROOT_DEF_RE = re.compile(r"--([a-z0-9-]+):\s*([^;]+);")
 _VAR_USE_RE = re.compile(r"var\(\s*--([a-z0-9-]+)\s*\)")
@@ -34,7 +39,6 @@ _VAR_USE_RE = re.compile(r"var\(\s*--([a-z0-9-]+)\s*\)")
 def main() -> int:
     design_tokens = load_tokens()
     root_block = root_css()
-    app_src = APP_PY.read_text(encoding="utf-8")
 
     # 1. Parse the :root definitions the app actually injects.
     root_defs = {name: value.strip() for name, value in _ROOT_DEF_RE.findall(root_block)}
@@ -50,15 +54,19 @@ def main() -> int:
                 f"  --{name}: app value {value!r} != DESIGN.md value {design_tokens[name]!r}"
             )
 
-    # Every var(--x) used in app.py must be defined in :root.
-    used = sorted(set(_VAR_USE_RE.findall(app_src)))
-    for name in used:
-        if name not in root_defs:
-            errors.append(f"  app/app.py uses var(--{name}) which is not defined in :root")
+    # Every var(--x) used in any CSS-bearing module must be defined in :root.
+    used: set[str] = set()
+    for src in CSS_SOURCES:
+        for name in _VAR_USE_RE.findall(src.read_text(encoding="utf-8")):
+            used.add(name)
+            if name not in root_defs:
+                errors.append(
+                    f"  {src.relative_to(REPO_ROOT)} uses var(--{name}) not defined in :root"
+                )
 
     print(f"DESIGN.md tokens:        {len(design_tokens)}")
     print(f":root definitions:       {len(root_defs)}")
-    print(f"var(--) refs in app.py:  {len(used)}")
+    print(f"var(--) refs (all CSS):  {len(used)}")
 
     if errors:
         print("\nFAIL — token validation errors:")
