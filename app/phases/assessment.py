@@ -33,6 +33,7 @@ FACT_FIELDS = [
     ("Country of origin", "origin_country", "text"),
     ("Current location", "current_country", "text"),
     ("What happened", "free_text_history", "text"),
+    ("Reason", "persecution_types", "chips"),
     ("Immediate danger", "immediate_danger", "bool"),
     ("Time displaced", "displacement_duration", "text"),
     ("Documents", "documents_available", "list"),

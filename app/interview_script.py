@@ -34,6 +34,9 @@ QUESTIONS: list[Question] = [
     Question("q_current", "current_country", State.SITUATION, "country"),
     Question("q_origin", "origin_country", State.SITUATION, "country"),
     Question("q_reason", "free_text_history", State.SITUATION, "text", alt_sid="q_reason_instill"),
+    Question("q_grounds", "persecution_types", State.SITUATION, "choice", kind="list",
+             options=["opt_political", "opt_ethnic", "opt_religious", "opt_gender",
+                      "opt_orientation", "opt_climate", "opt_other"]),
     Question("q_danger", "immediate_danger", State.SITUATION, "yesno", kind="bool"),
     Question("q_duration", "displacement_duration", State.HISTORY, "text", skip_if_in_origin=True),
     Question("q_documents", "documents_available", State.HISTORY, "choice", kind="list",
@@ -62,6 +65,10 @@ TR: dict[str, dict[str, str]] = {
         "opt_yes": "Yes", "opt_no": "No",
         "opt_passport": "Passport", "opt_id": "National ID", "opt_birth": "Birth certificate",
         "opt_none": "None", "opt_other": "Other",
+        "q_grounds": "Which of these best describe your situation? (Choose any that apply.)",
+        "opt_political": "Political", "opt_ethnic": "Ethnic", "opt_religious": "Religious",
+        "opt_gender": "Gender-based", "opt_orientation": "Sexual orientation",
+        "opt_climate": "Climate displacement",
         "ui_answer": "Your answer", "ui_continue": "Continue",
     },
     "French": {
@@ -283,6 +290,39 @@ _EXTRA = {
     },
 }
 for _lang, _d in _EXTRA.items():
+    TR.setdefault(_lang, {}).update(_d)
+
+# Persecution-grounds question + category labels (multi-select).
+_GROUNDS = {
+    "French": {"q_grounds": "Parmi ces situations, laquelle correspond à la vôtre ? (Choisissez celles qui s'appliquent.)",
+               "opt_political": "Politique", "opt_ethnic": "Ethnique", "opt_religious": "Religieux",
+               "opt_gender": "Lié au genre", "opt_orientation": "Orientation sexuelle", "opt_climate": "Déplacement climatique"},
+    "Spanish": {"q_grounds": "¿Cuál de estas situaciones describe la suya? (Elige las que correspondan.)",
+                "opt_political": "Político", "opt_ethnic": "Étnico", "opt_religious": "Religioso",
+                "opt_gender": "De género", "opt_orientation": "Orientación sexual", "opt_climate": "Desplazamiento climático"},
+    "Portuguese": {"q_grounds": "Qual destas situações descreve a sua? (Escolha as que se aplicam.)",
+                   "opt_political": "Político", "opt_ethnic": "Étnico", "opt_religious": "Religioso",
+                   "opt_gender": "De gênero", "opt_orientation": "Orientação sexual", "opt_climate": "Deslocamento climático"},
+    "Arabic": {"q_grounds": "أيٌّ من هذه الحالات تنطبق عليك؟ (اختر كل ما ينطبق.)",
+               "opt_political": "سياسي", "opt_ethnic": "عِرقي", "opt_religious": "ديني",
+               "opt_gender": "قائم على النوع الاجتماعي", "opt_orientation": "الميل الجنسي", "opt_climate": "النزوح المناخي"},
+    "Hindi": {"q_grounds": "इनमें से कौन-सी स्थिति आप पर लागू होती है? (जो भी लागू हों चुनें।)",
+              "opt_political": "राजनीतिक", "opt_ethnic": "जातीय", "opt_religious": "धार्मिक",
+              "opt_gender": "लिंग आधारित", "opt_orientation": "यौन रुझान", "opt_climate": "जलवायु विस्थापन"},
+    "Chinese": {"q_grounds": "以下哪些情况符合您的处境？（可多选）",
+                "opt_political": "政治", "opt_ethnic": "族裔", "opt_religious": "宗教",
+                "opt_gender": "基于性别", "opt_orientation": "性取向", "opt_climate": "气候流离失所"},
+    "Japanese": {"q_grounds": "次のうち、あなたの状況に当てはまるものはどれですか？（複数選択可）",
+                 "opt_political": "政治的", "opt_ethnic": "民族的", "opt_religious": "宗教的",
+                 "opt_gender": "ジェンダーに基づく", "opt_orientation": "性的指向", "opt_climate": "気候による避難"},
+    "Korean": {"q_grounds": "다음 중 귀하의 상황에 해당하는 것은 무엇인가요? (해당되는 것을 모두 선택하세요.)",
+               "opt_political": "정치적", "opt_ethnic": "민족적", "opt_religious": "종교적",
+               "opt_gender": "성별 기반", "opt_orientation": "성적 지향", "opt_climate": "기후 이재민"},
+    "Russian": {"q_grounds": "Что из перечисленного описывает вашу ситуацию? (Выберите все подходящее.)",
+                "opt_political": "Политическое", "opt_ethnic": "Этническое", "opt_religious": "Религиозное",
+                "opt_gender": "По признаку пола", "opt_orientation": "Сексуальная ориентация", "opt_climate": "Климатическое перемещение"},
+}
+for _lang, _d in _GROUNDS.items():
     TR.setdefault(_lang, {}).update(_d)
 
 

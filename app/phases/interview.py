@@ -242,6 +242,7 @@ def _labeled_facts(session: SessionState) -> str:
         ("Country of origin", iv.origin_country),
         ("Current country", iv.current_country),
         ("What happened", iv.free_text_history),
+        ("Reason", ", ".join(iv.persecution_types) if iv.persecution_types else None),
         ("Immediate danger", None if iv.immediate_danger is None else ("yes" if iv.immediate_danger else "no")),
         ("Time since leaving", iv.displacement_duration),
         ("Documents", ", ".join(iv.documents_available) if iv.documents_available else None),
@@ -383,19 +384,34 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
         return (render_chat(session.messages), render_rail(session.state),
                 *control_updates(session, idx), session, idx)
 
+    _HIDE4 = (gr.update(visible=False), gr.update(visible=False),
+              gr.update(visible=False), gr.update(visible=False))
+
+    def _frames(o, loop):
+        """Two render passes: show the new question with controls hidden, then
+        reveal the control. Splitting the transition makes Gradio render the
+        choice controls immediately instead of one Continue-press late."""
+        return [
+            (o[0], o[1], *_HIDE4, o[6], loop, o[7]),
+            (o[0], o[1], o[2], o[3], o[4], o[5], o[6], loop, o[7]),
+        ]
+
     async def start(session, loop, slot_idx=0):
         if session is None:
             session = SessionState(); session.transition_to(State.INTAKE)
         loop = loop or create_loop()
-        out = await _present(session, loop, 0)
-        yield (out[0], out[1], out[2], out[3], out[4], out[5], out[6], loop, out[7])
+        o = await _present(session, loop, 0)
+        for frame in _frames(o, loop):
+            yield frame
 
     async def on_continue(radio_v, multi_v, country_v, text_v, session, loop, idx):
         if session is None:
             session = SessionState(); session.transition_to(State.INTAKE)
             loop = loop or create_loop()
             o = await _present(session, loop, 0)
-            return (o[0], o[1], o[2], o[3], o[4], o[5], o[6], loop, o[7])
+            for frame in _frames(o, loop):
+                yield frame
+            return
         loop = loop or create_loop()
         lang = session.language
 
@@ -403,32 +419,40 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
         if idx == CORRECT_INDEX:
             correction = (text_v or "").strip()
             if not correction:
-                return (gr.update(), gr.update(), *control_updates(session, idx), session, loop, idx)
+                yield (gr.update(), gr.update(), *control_updates(session, idx), session, loop, idx)
+                return
             session.messages = list(session.messages) + [{"role": "user", "content": correction}]
             await _apply_correction(session, loop, correction)
-            o = await _present(session, loop, REVIEW_INDEX)  # show the corrected summary
-            return (o[0], o[1], o[2], o[3], o[4], o[5], o[6], loop, o[7])
+            o = await _present(session, loop, REVIEW_INDEX)
+            for frame in _frames(o, loop):
+                yield frame
+            return
 
         # Review step
         if idx >= REVIEW_INDEX:
             if not radio_v:
-                return (gr.update(), gr.update(), *control_updates(session, idx), session, loop, idx)
+                yield (gr.update(), gr.update(), *control_updates(session, idx), session, loop, idx)
+                return
             session.messages = list(session.messages) + [{"role": "user", "content": radio_v}]
             if radio_v == t(lang, "review_yes"):
                 advance_to(session, State.ASSESSMENT)  # triggers assessment via .then()
-                return (render_chat(session.messages), render_rail(session.state),
-                        gr.update(visible=False), gr.update(visible=False),
-                        gr.update(visible=False), gr.update(visible=False), session, loop, idx)
-            o = await _present(session, loop, CORRECT_INDEX)  # ask what to change (free text)
-            return (o[0], o[1], o[2], o[3], o[4], o[5], o[6], loop, o[7])
+                yield (render_chat(session.messages), render_rail(session.state),
+                       *_HIDE4, session, loop, idx)
+                return
+            o = await _present(session, loop, CORRECT_INDEX)  # ask what to change
+            for frame in _frames(o, loop):
+                yield frame
+            return
 
         q = QUESTIONS[idx]
         display = _store(session, q, radio_v, multi_v, country_v, text_v)
         if display is None:
-            return (gr.update(), gr.update(), *control_updates(session, idx), session, loop, idx)
+            yield (gr.update(), gr.update(), *control_updates(session, idx), session, loop, idx)
+            return
         session.messages = list(session.messages) + [{"role": "user", "content": display}]
         o = await _present(session, loop, _next_index(session, idx))
-        return (o[0], o[1], o[2], o[3], o[4], o[5], o[6], loop, o[7])
+        for frame in _frames(o, loop):
+            yield frame
 
     continue_event = cont.click(
         on_continue,
