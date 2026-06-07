@@ -1,32 +1,37 @@
-"""agent/tools/doc_generator.py — Phase 5 document package generator (T049/T050).
+"""agent/tools/doc_generator.py — Phase 5 document package (PDF + editable Word).
 
-Generates four PDFs from the completed session using WeasyPrint + HTML templates
-(agent/tools/templates/). Every pre-filled value comes only from
-``session.interview`` / ``session.assessment`` / ``session.selected_country`` —
-nothing is invented (CLAUDE.md Critical Rule 4). Pre-filled fields are wrapped in
-an amber-highlight ``.fill`` span; missing fields render as a blank line (never a
-literal "PLACEHOLDER"/"[NAME]"). Every filled field is logged with its source key.
-
-Output PDFs go to an ephemeral temp directory (ARCHITECTURE.md §Security).
+Generates the document package from real session data. The **personal statement
+is drafted by the LLM** (see agent/drafting.py) — an in-depth, first-person
+narrative with ``[placeholders]`` the person completes — and every document is
+exported as both an **editable Word (.docx)** file and a print-ready **PDF**.
+Country facts come from the curated data via country_lookup; nothing is
+fabricated (CLAUDE.md Rule 4).
 """
 
 from __future__ import annotations
 
 import html
 import logging
+import re
 import tempfile
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
+from docx import Document
+from docx.shared import Pt, RGBColor
 from weasyprint import HTML
 
+from agent.drafting import fallback_statement
 from agent.tools.country_lookup import lookup_country
 
 logger = logging.getLogger("refuge.doc_generator")
 
 TEMPLATES = Path(__file__).resolve().parent / "templates"
 _HEAD = (TEMPLATES / "_head.html").read_text(encoding="utf-8")
+_PLACEHOLDER = re.compile(r"(\[[^\]]+\])")
+_AMBER = RGBColor(0xC2, 0x63, 0x29)
+_TEAL = RGBColor(0x0A, 0x50, 0x42)
 
 
 @dataclass
@@ -34,177 +39,210 @@ class GeneratedDoc:
     key: str
     title: str
     meta: str
-    path: Path
+    pdf_path: Path
+    docx_path: Path
 
 
-# -- field helpers ----------------------------------------------------------
+# -- shared helpers ---------------------------------------------------------
 
-def _is_empty(value) -> bool:
-    return value is None or value == "" or value == [] or value == {}
-
-
-def fill(value, source_key: str, *, fallback_blank: bool = True) -> str:
-    """Amber-highlight a pre-filled value, logging its source. Blank if missing."""
-    if _is_empty(value):
-        return '<span class="blank">&nbsp;</span>' if fallback_blank else ""
-    text = ", ".join(str(v) for v in value) if isinstance(value, list) else str(value)
-    logger.info("Filling field from session key: %s", source_key)
-    return f'<span class="fill">{html.escape(text)}</span>'
+def _paras(text: str) -> list[str]:
+    return [p.strip() for p in text.split("\n") if p.strip()]
 
 
-def _render(template_name: str, tokens: dict[str, str]) -> str:
-    tpl = (TEMPLATES / template_name).read_text(encoding="utf-8")
-    tpl = tpl.replace("%%HEAD%%", _HEAD)
-    for key, value in tokens.items():
-        tpl = tpl.replace(f"%%{key}%%", value)
-    return tpl
+def _html_with_placeholders(text: str) -> str:
+    """Render free text into HTML, highlighting [placeholders] in amber."""
+    out = []
+    for para in _paras(text):
+        pieces = []
+        for part in _PLACEHOLDER.split(para):
+            if not part:
+                continue
+            if _PLACEHOLDER.fullmatch(part):
+                pieces.append(f'<span class="fill">{html.escape(part)}</span>')
+            else:
+                pieces.append(html.escape(part))
+        out.append("<p>" + "".join(pieces) + "</p>")
+    return "\n".join(out)
 
 
-# -- per-document HTML builders --------------------------------------------
-
-def _personal_statement_html(session) -> str:
-    iv = session.interview
-    family_clause = ""
-    if not _is_empty(iv.family_situation):
-        family_clause = f", traveling with {fill(iv.family_situation, 'interview.family_situation')}"
-    history_para = ""
-    if not _is_empty(iv.free_text_history):
-        history_para = f"<p>{fill(iv.free_text_history, 'interview.free_text_history')}</p>"
-    return _render("personal_statement.html", {
-        "full_name": fill(None, "interview.full_name"),  # not collected — blank to complete
-        "origin_country": fill(iv.origin_country, "interview.origin_country"),
-        "current_country": fill(iv.current_country, "interview.current_country"),
-        "family_clause": family_clause,
-        "persecution": fill(iv.persecution_types, "interview.persecution_types"),
-        "history_para": history_para,
-    })
+def _docx_add_rich(doc: Document, text: str):
+    """Add paragraphs, bolding [placeholders] so they're easy to find and edit."""
+    for para in _paras(text):
+        p = doc.add_paragraph()
+        for part in _PLACEHOLDER.split(para):
+            if not part:
+                continue
+            run = p.add_run(part)
+            if _PLACEHOLDER.fullmatch(part):
+                run.bold = True
+                run.font.color.rgb = _AMBER
 
 
-def _action_plan_html(session, rec: dict | None) -> str:
+def _new_docx(title: str, subtitle: str) -> Document:
+    doc = Document()
+    h = doc.add_heading(title, level=0)
+    try:
+        h.runs[0].font.color.rgb = _TEAL
+    except Exception:
+        pass
+    sub = doc.add_paragraph(subtitle)
+    sub.runs[0].italic = True
+    sub.runs[0].font.size = Pt(9)
+    sub.runs[0].font.color.rgb = RGBColor(0x6B, 0x72, 0x80)
+    return doc
+
+
+def _pdf_from_html(body_html: str, path: Path):
+    HTML(string=f"<!DOCTYPE html><html><head>{_HEAD}</head><body>{body_html}</body></html>").write_pdf(str(path))
+
+
+# -- per-document content ---------------------------------------------------
+
+def _statement_body_html(text: str) -> str:
+    return (
+        "<h1>Personal Statement</h1>"
+        '<p class="sub">In support of an application for refugee status · Prepared with Refuge</p>'
+        f"{_html_with_placeholders(text)}"
+        '<p class="note">Fields in amber are placeholders for you to complete. You can edit any part '
+        "of this statement in the Word (.docx) version.</p>"
+    )
+
+
+def _rec_for(session):
+    if session.selected_country:
+        rec = lookup_country(session.selected_country)
+        return None if rec.get("error") else rec
+    return None
+
+
+def _action_plan_blocks(session, rec):
     country = session.selected_country or "your chosen country"
     months = (rec or {}).get("processingTimeMonths")
-    processing = f"about {months} months" if months else "a variable amount of time"
     office = (rec or {}).get("unhcrOffice")
-    unhcr = f"Yes — {office}" if office else ("Yes" if (rec or {}).get("unhcrPresence") else "Check locally")
-    steps_src = (rec or {}).get("steps") or [
+    steps = (rec or {}).get("steps") or [
         "Register with UNHCR or the asylum authority",
         "File your asylum claim with your personal statement",
         "Attend your refugee status interview (RSD)",
         "Receive the decision (appeal if refused)",
         "Access integration support",
     ]
-    steps_html = "".join(
-        f'<p class="step"><b>Step {i}.</b> {html.escape(str(s))}</p>'
-        for i, s in enumerate(steps_src, start=1)
-    )
-    return _render("action_plan.html", {
-        "selected_country": html.escape(str(country)),
-        "processing": processing,
-        "unhcr_office": html.escape(str(unhcr)),
-        "steps": steps_html,
-    })
+    intro = (f"This plan is for seeking protection in {country}. "
+             f"Typical processing: {('about ' + str(months) + ' months') if months else 'varies'}. "
+             f"UNHCR: {('Yes — ' + office) if office else 'check locally'}.")
+    return country, intro, steps
 
 
-def _emergency_contacts_html(session, rec: dict | None) -> str:
-    country = session.selected_country or "your chosen country"
-    office = (rec or {}).get("unhcrOffice") or "Nearest UNHCR office"
-    orgs = (rec or {}).get("legalAidOrgs") or []
-    if orgs:
-        orgs_html = "".join(
-            f'<div class="org"><b>{html.escape(str(o.get("name", "")))}</b>'
-            f'<span>{html.escape(str(o.get("url", "")))}</span></div>'
-            for o in orgs if isinstance(o, dict)
-        )
-    else:
-        orgs_html = "<p>Ask the UNHCR office for a list of registered legal-aid partners.</p>"
-    return _render("emergency_contacts.html", {
-        "selected_country": html.escape(str(country)),
-        "unhcr_office": html.escape(str(office)),
-        "orgs": orgs_html,
-    })
+def _orgs(rec):
+    return [(o.get("name", ""), o.get("url", "")) for o in (rec or {}).get("legalAidOrgs", []) if isinstance(o, dict)]
 
 
-def _rights_card_html(session) -> str:
-    grounds = session.assessment.convention_grounds or []
-    grounds_txt = ", ".join(grounds) if grounds else "to be confirmed in your interview"
-    return _render("rights_summary_card.html", {
-        "origin_country": fill(session.interview.origin_country, "interview.origin_country"),
-        "selected_country": html.escape(str(session.selected_country or "your chosen country")),
-        "grounds": html.escape(grounds_txt),
-    })
+# -- generation -------------------------------------------------------------
 
-
-# -- public API -------------------------------------------------------------
-
-_DOCS = [
-    ("personal_statement", "Personal statement (pre-filled)", "PDF · narrative for your claim"),
-    ("action_plan", "Action plan", "PDF · step-by-step roadmap with contacts"),
-    ("emergency_contacts", "Emergency contacts", "PDF · UNHCR offices & legal aid"),
-    ("rights_summary_card", "Your rights — summary card", "PDF · key protections"),
-]
-
-
-def build_html(session) -> dict[str, str]:
-    """Return {key: full_html} for all four documents (handy for tests/preview)."""
-    rec = None
-    if session.selected_country:
-        looked = lookup_country(session.selected_country)
-        rec = None if looked.get("error") else looked
-    return {
-        "personal_statement": _personal_statement_html(session),
-        "action_plan": _action_plan_html(session, rec),
-        "emergency_contacts": _emergency_contacts_html(session, rec),
-        "rights_summary_card": _rights_card_html(session),
-    }
-
-
-def preview_statement_html(session) -> str:
-    """Inline (head-less) personal-statement snippet for the on-screen preview."""
-    iv = session.interview
-    family_clause = ""
-    if not _is_empty(iv.family_situation):
-        family_clause = f", traveling with {fill(iv.family_situation, 'interview.family_situation')}"
-    history = ""
-    if not _is_empty(iv.free_text_history):
-        history = f"<p>{fill(iv.free_text_history, 'interview.free_text_history')}</p>"
-    return (
-        '<article class="doc"><h4>Personal Statement</h4>'
-        '<p class="doc__sub">In support of an application for refugee status · Prepared with Refuge</p>'
-        f"<p>My name is {fill(None, 'interview.full_name')}. I am a national of "
-        f"{fill(iv.origin_country, 'interview.origin_country')}. I am currently in "
-        f"{fill(iv.current_country, 'interview.current_country')}{family_clause}.</p>"
-        '<div class="doc__divider"></div>'
-        f"<p>I left my home because of {fill(iv.persecution_types, 'interview.persecution_types')}.</p>"
-        f"{history}"
-        "</article>"
-    )
-
-
-def generate(session, out_dir: Path | None = None) -> list[GeneratedDoc]:
-    """Generate the four PDFs. Returns GeneratedDoc records with file paths."""
+def generate(session, statement: str | None = None, out_dir: Path | None = None) -> list[GeneratedDoc]:
+    """Build the 4 documents as PDF + DOCX. ``statement`` is the LLM-drafted
+    personal statement; if omitted, a deterministic fallback is used."""
     out_dir = Path(out_dir) if out_dir else Path(tempfile.mkdtemp(prefix="refuge_docs_"))
     out_dir.mkdir(parents=True, exist_ok=True)
-    htmls = build_html(session)
-
+    stmt = statement or fallback_statement(session)
+    rec = _rec_for(session)
     docs: list[GeneratedDoc] = []
-    for key, title, meta in _DOCS:
-        path = out_dir / f"{key}.pdf"
-        HTML(string=htmls[key]).write_pdf(str(path))
-        docs.append(GeneratedDoc(key=key, title=title, meta=meta, path=path))
-    logger.info("Generated %d documents in %s", len(docs), out_dir)
+
+    # 1. Personal statement (LLM-drafted) — PDF + DOCX
+    ps_pdf, ps_docx = out_dir / "personal_statement.pdf", out_dir / "personal_statement.docx"
+    _pdf_from_html(_statement_body_html(stmt), ps_pdf)
+    d = _new_docx("Personal Statement", "In support of an application for refugee status · Prepared with Refuge")
+    _docx_add_rich(d, stmt)
+    d.save(str(ps_docx))
+    docs.append(GeneratedDoc("personal_statement", "Personal statement (editable)",
+                             "Word + PDF · drafted for you, with placeholders to complete", ps_pdf, ps_docx))
+
+    # 2. Action plan
+    country, intro, steps = _action_plan_blocks(session, rec)
+    ap_html = (f"<h1>Action Plan — {html.escape(country)}</h1>"
+               '<p class="sub">Step-by-step roadmap · Prepared with Refuge</p>'
+               f"<p>{html.escape(intro)}</p>" +
+               "".join(f'<p class="step"><b>Step {i}.</b> {html.escape(str(s))}</p>'
+                       for i, s in enumerate(steps, 1)))
+    ap_pdf, ap_docx = out_dir / "action_plan.pdf", out_dir / "action_plan.docx"
+    _pdf_from_html(ap_html, ap_pdf)
+    d = _new_docx(f"Action Plan — {country}", "Step-by-step roadmap · Prepared with Refuge")
+    d.add_paragraph(intro)
+    for i, s in enumerate(steps, 1):
+        d.add_paragraph(f"Step {i}. {s}", style="List Number" if "List Number" in [s.name for s in d.styles] else None)
+    d.save(str(ap_docx))
+    docs.append(GeneratedDoc("action_plan", "Action plan", "Word + PDF · roadmap with contacts", ap_pdf, ap_docx))
+
+    # 3. Emergency contacts
+    office = (rec or {}).get("unhcrOffice") or "Nearest UNHCR office"
+    orgs = _orgs(rec)
+    ec_html = ("<h1>Emergency Contacts</h1>"
+               '<p class="sub">UNHCR offices &amp; legal aid · Prepared with Refuge</p>'
+               f"<h2>{html.escape(country)}</h2><p>UNHCR office: {html.escape(office)}</p>"
+               "<h2>Legal aid &amp; support</h2>" +
+               ("".join(f'<div class="org"><b>{html.escape(n)}</b><span>{html.escape(u)}</span></div>' for n, u in orgs)
+                or "<p>Ask the UNHCR office for registered legal-aid partners.</p>"))
+    ec_pdf, ec_docx = out_dir / "emergency_contacts.pdf", out_dir / "emergency_contacts.docx"
+    _pdf_from_html(ec_html, ec_pdf)
+    d = _new_docx("Emergency Contacts", "UNHCR offices & legal aid · Prepared with Refuge")
+    d.add_paragraph(f"{country} — UNHCR office: {office}")
+    for n, u in orgs:
+        d.add_paragraph(f"{n} — {u}")
+    d.save(str(ec_docx))
+    docs.append(GeneratedDoc("emergency_contacts", "Emergency contacts", "Word + PDF · UNHCR & legal aid", ec_pdf, ec_docx))
+
+    # 4. Rights summary card
+    grounds = ", ".join(session.assessment.convention_grounds) if session.assessment.convention_grounds else "to be confirmed"
+    rc_html = ("<h1>Your Rights — Summary Card</h1>"
+               '<p class="sub">Key protections · Prepared with Refuge</p>'
+               "<h2>Non-refoulement</h2><p>You cannot be forced back to a country where your life or freedom "
+               "would be at serious risk (1951 Refugee Convention).</p>"
+               "<h2>While your claim is decided</h2><ul>"
+               "<li>The right to seek asylum and a fair hearing.</li>"
+               "<li>The right to an interpreter and free legal assistance.</li>"
+               "<li>The right not to be detained arbitrarily.</li>"
+               "<li>The right to shelter, food, and emergency healthcare.</li></ul>"
+               f"<p>Origin: {html.escape(session.interview.origin_country or '[origin]')} · "
+               f"Seeking protection in: {html.escape(country)} · Grounds: {html.escape(grounds)}</p>")
+    rc_pdf, rc_docx = out_dir / "rights_summary_card.pdf", out_dir / "rights_summary_card.docx"
+    _pdf_from_html(rc_html, rc_pdf)
+    d = _new_docx("Your Rights — Summary Card", "Key protections · Prepared with Refuge")
+    d.add_paragraph("Non-refoulement: you cannot be forced back to a country where your life or freedom "
+                    "would be at serious risk (1951 Refugee Convention).")
+    for r in ["The right to seek asylum and a fair hearing.",
+              "The right to an interpreter and free legal assistance.",
+              "The right not to be detained arbitrarily.",
+              "The right to shelter, food, and emergency healthcare."]:
+        d.add_paragraph(r, style=None)
+    d.save(str(rc_docx))
+    docs.append(GeneratedDoc("rights_summary_card", "Your rights — summary card", "Word + PDF · key protections", rc_pdf, rc_docx))
+
+    logger.info("Generated %d documents (PDF + DOCX) in %s", len(docs), out_dir)
     return docs
 
 
+def all_files(docs: list[GeneratedDoc]) -> list[str]:
+    files = []
+    for d in docs:
+        files.append(str(d.docx_path))
+        files.append(str(d.pdf_path))
+    return files
+
+
 def zip_package(docs: list[GeneratedDoc], out_dir: Path | None = None) -> Path:
-    """Bundle the generated PDFs into a single zip for "Download all"."""
-    base = Path(out_dir) if out_dir else docs[0].path.parent
+    base = Path(out_dir) if out_dir else docs[0].pdf_path.parent
     zip_path = base / "refuge_documents.zip"
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        for d in docs:
-            zf.write(d.path, arcname=d.path.name)
+        for f in all_files(docs):
+            zf.write(f, arcname=Path(f).name)
     return zip_path
 
 
-__all__ = [
-    "generate", "build_html", "preview_statement_html", "zip_package", "GeneratedDoc", "fill",
-]
+def preview_statement_html(session, statement: str | None = None) -> str:
+    """Head-less personal-statement snippet for the on-screen preview."""
+    stmt = statement or fallback_statement(session)
+    return ('<article class="doc"><h4>Personal Statement</h4>'
+            '<p class="doc__sub">In support of an application for refugee status · Prepared with Refuge</p>'
+            f"{_html_with_placeholders(stmt)}</article>")
+
+
+__all__ = ["generate", "preview_statement_html", "zip_package", "all_files", "GeneratedDoc"]

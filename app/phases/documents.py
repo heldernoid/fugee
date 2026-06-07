@@ -14,7 +14,7 @@ from dataclasses import dataclass
 
 import gradio as gr
 
-from agent.tools.doc_generator import generate, preview_statement_html, zip_package
+from agent.tools.doc_generator import all_files, generate, preview_statement_html, zip_package
 from app.state.session import SessionState
 
 # Evidence checklist: (label, sublabel, document_available key or None).
@@ -91,12 +91,12 @@ def build(visible: bool = False, session_st: gr.State | None = None) -> Document
                     gr.HTML('<p class="pkg__lbl">Evidence to gather</p>')
                     checklist = gr.CheckboxGroup(
                         choices=[label for label, _s, _k in CHECKLIST],
-                        value=[], label="", elem_id="docs-checklist",
+                        value=[], label="", show_label=False, elem_id="docs-checklist",
                     )
-                    gr.HTML('<p class="pkg__lbl">Your files</p>')
-                    files = gr.File(label="", interactive=False, elem_id="docs-files")
+                    gr.HTML('<p class="pkg__lbl">Your files · Word (editable) + PDF</p>')
+                    files = gr.File(label="", show_label=False, interactive=False, elem_id="docs-files")
                     download_all = gr.DownloadButton(
-                        "⤓ Download all (4 files)", elem_id="docs-download", visible=False
+                        "⤓ Download all (Word + PDF)", elem_id="docs-download", visible=False
                     )
                     start_over = gr.Button(
                         "↺ Start over for a different country", elem_id="docs-startover"
@@ -104,13 +104,22 @@ def build(visible: bool = False, session_st: gr.State | None = None) -> Document
 
     render_outputs = [preview, checklist, files, download_all]
 
-    def populate(session: SessionState) -> list:
-        docs = generate(session)
+    async def populate(session: SessionState) -> list:
+        # The agent drafts the personal statement (LLM), then we render PDF + Word.
+        from agent.drafting import draft_personal_statement
+        try:
+            statement = await draft_personal_statement(session)
+        except Exception:
+            statement = None
+        if not statement:
+            from agent.drafting import fallback_statement
+            statement = fallback_statement(session)
+        docs = generate(session, statement=statement)
         zip_path = zip_package(docs)
         return [
-            gr.update(value=preview_statement_html(session)),
+            gr.update(value=preview_statement_html(session, statement)),
             gr.update(value=_checklist_values(session)),
-            gr.update(value=[str(d.path) for d in docs]),
+            gr.update(value=all_files(docs)),
             gr.update(value=str(zip_path), visible=True),
         ]
 

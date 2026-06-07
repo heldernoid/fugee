@@ -5,8 +5,9 @@
 # UI framework
 gradio==6.15.2          # latest 6.16.0
 
-# Document generation (Phase 5)
+# Document generation (Phase 5) — PDF + editable Word
 weasyprint==68.1        # latest 69.0
+python-docx==1.1.2      # latest 1.2.0 — editable .docx export
 
 # HTTP client (tool API calls; stubbed at this boundary in unit tests)
 httpx==0.28.0           # latest 0.28.1

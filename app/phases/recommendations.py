@@ -100,7 +100,14 @@ def _unhcr_label(rec: dict) -> str:
 
 def _acceptance_label(rec: dict) -> str:
     rate = rec.get("acceptanceRate")
-    return str(rate) if rate else "Not published"
+    if rate in (None, "", "PENDING"):
+        return "Not published"
+    try:
+        pct = float(rate)
+        pct = pct * 100 if pct <= 1 else pct  # stored as 0-1 fraction
+        return f"{round(pct)}%"
+    except (TypeError, ValueError):
+        return str(rate)
 
 
 def _language_label(rec: dict) -> str:
@@ -117,7 +124,7 @@ def card_body_html(rec: dict) -> str:
     facts = [
         ("Processing time", _processing_label(rec)),
         ("UNHCR office", _unhcr_label(rec)),
-        ("Acceptance (your profile)", _acceptance_label(rec)),
+        ("Recognition rate (recent)", _acceptance_label(rec)),
         ("Primary language", _language_label(rec)),
     ]
     facts_html = "".join(

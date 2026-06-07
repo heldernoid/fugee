@@ -16,6 +16,7 @@ from dataclasses import dataclass
 import gradio as gr
 
 from agent.events import ErrorEvent, TextDeltaEvent, ToolEndEvent, ToolStartEvent
+from agent.loop import LoopHooks
 from agent.tools.asylum_stats import asylum_stats_tool
 from agent.tools.country_lookup import country_lookup_tool, lookup_country
 from agent.tools.web_search import web_search_tool
@@ -31,12 +32,12 @@ ASSESSMENT_TOOLS = [web_search_tool, country_lookup_tool, asylum_stats_tool]
 FACT_FIELDS = [
     ("Country of origin", "origin_country", "text"),
     ("Current location", "current_country", "text"),
-    ("Reason for leaving", "persecution_types", "chips"),
+    ("What happened", "free_text_history", "text"),
     ("Immediate danger", "immediate_danger", "bool"),
-    ("Family situation", "family_situation", "text"),
+    ("Time displaced", "displacement_duration", "text"),
+    ("Documents", "documents_available", "list"),
     ("Languages", "languages_spoken", "list"),
     ("Destination preference", "destination_preferences", "list"),
-    ("Time displaced", "displacement_duration", "text"),
 ]
 
 ASSESSMENT_CSS = """
@@ -169,11 +170,29 @@ async def stream_assessment(session: SessionState, loop):
     pct = 5
     status = ""
     looked_up: list[str] = []  # countries the agent actually researched
+
+    # Agentic control (ported from pi's AgentLoopConfig hooks):
+    #  * stop once the structured @@ASSESSMENT block is produced (no rambling)
+    #  * privacy guard: never let the person's free-text story into a web query
+    def _stop(assistant_message, history):
+        return "@@ASSESSMENT" in (assistant_message or {}).get("content", "")
+
+    story = (session.interview.free_text_history or "").strip().lower()
+
+    def _guard(name, args):
+        if name == "web_search" and story:
+            q = str((args or {}).get("query", "")).lower()
+            if story and (story[:40] in q):
+                return {"block": True, "reason": "query contained personal narrative (privacy)"}
+        return None
+
+    hooks = LoopHooks(should_stop_after_turn=_stop, before_tool_call=_guard)
+
     yield facts_html, render_reason(acc), render_progress(pct, "")
 
     async for ev in loop.run(
         prompt, session, system_prompt=system_prompt,
-        tools=ASSESSMENT_TOOLS, thinking_level="medium",
+        tools=ASSESSMENT_TOOLS, thinking_level="medium", hooks=hooks,
     ):
         if isinstance(ev, TextDeltaEvent):
             acc += ev.delta

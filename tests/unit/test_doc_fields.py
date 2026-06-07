@@ -1,49 +1,40 @@
-"""tests/unit/test_doc_fields.py — pre-fill field rules (T055).
+"""tests/unit/test_doc_fields.py — document drafting field rules.
 
-Pre-filled values trace to real session keys and are amber-highlighted; missing
-fields render as a blank line (never a crash, never an invented value).
+The personal statement is drafted (LLM at runtime; deterministic fallback here);
+pre-filled values trace to real session data; missing specifics become clearly
+marked [placeholders]; nothing is fabricated.
 """
 
-from agent.tools.doc_generator import build_html, fill
+from agent.drafting import fallback_statement
+from agent.tools.doc_generator import _html_with_placeholders, preview_statement_html
 from app.state.session import SessionState, State
 
 
-def test_fill_present_value_is_highlighted():
-    out = fill("Ethiopia", "interview.origin_country")
-    assert "Ethiopia" in out
-    assert 'class="fill"' in out
-
-
-def test_fill_missing_value_is_blank_not_placeholder():
-    out = fill(None, "interview.origin_country")
-    assert 'class="blank"' in out
-    assert "Ethiopia" not in out
-    assert "None" not in out  # never leak the literal None
-    assert "PLACEHOLDER" not in out and "[NAME]" not in out
-
-
-def test_fill_list_is_joined_and_escaped():
-    out = fill(["Political", "Ethnic"], "interview.persecution_types")
-    assert "Political, Ethnic" in out
-    safe = fill("<script>x</script>", "interview.free_text_history")
-    assert "<script>" not in safe  # HTML-escaped
-
-
-def _min_session() -> SessionState:
+def _session(origin="Ethiopia"):
     s = SessionState()
     for t in (State.INTAKE, State.SITUATION, State.HISTORY, State.GOALS, State.REVIEW,
               State.ASSESSMENT, State.RECOMMENDATIONS, State.DOCUMENTS):
         s.transition_to(t)
+    s.interview.origin_country = origin
+    s.interview.current_country = "Sudan"
+    s.interview.free_text_history = "Armed men came to our village."
     return s
 
 
-def test_build_html_with_no_data_does_not_crash():
-    # origin_country is None and nothing is filled — must render blanks, not crash.
-    s = _min_session()
-    htmls = build_html(s)
-    assert set(htmls) == {
-        "personal_statement", "action_plan", "emergency_contacts", "rights_summary_card"
-    }
-    statement = htmls["personal_statement"]
-    assert 'class="blank"' in statement  # origin rendered as a blank line
-    assert "None" not in statement
+def test_fallback_statement_uses_real_data_and_placeholders():
+    out = fallback_statement(_session())
+    assert "Ethiopia" in out                 # real data
+    assert "[your full name]" in out          # placeholder for the person to fill
+    assert "Armed men came to our village." in out
+
+
+def test_placeholders_highlighted_in_html():
+    html = _html_with_placeholders("My name is [your full name].")
+    assert 'class="fill"' in html and "[your full name]" in html
+
+
+def test_preview_renders_without_crash_on_empty_session():
+    s = SessionState()
+    html = preview_statement_html(s)  # no data -> placeholders, no crash
+    assert "Personal Statement" in html
+    assert "None" not in html

@@ -202,13 +202,13 @@ def build_app() -> gr.Blocks:
         # Recommendations -> Documents: generate the package for the chosen country.
         docs_outputs = [reco_ui.column, docs_ui.column, *docs_ui.render_outputs]
 
-        def show_documents(session):
+        async def show_documents(session):
             if session is None or not session.selected_country:
                 return [gr.update()] * len(docs_outputs)
             if session.state < State.DOCUMENTS:
                 from app.phases.interview import advance_to
                 advance_to(session, State.DOCUMENTS)
-            updates = docs_ui.populate(session)
+            updates = await docs_ui.populate(session)  # LLM drafts the statement
             return [gr.update(visible=False), gr.update(visible=True), *updates]
 
         reco_ui.proceed.click(show_documents, inputs=[session_st], outputs=docs_outputs)

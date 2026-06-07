@@ -23,9 +23,11 @@ Guarantees:
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import os
-from typing import AsyncGenerator, Iterable, Optional
+from dataclasses import dataclass
+from typing import AsyncGenerator, Callable, Iterable, Optional
 
 from agent.events import (
     AgentEndEvent,
@@ -43,6 +45,36 @@ from agent.tools.base import AgentTool
 DEFAULT_MODEL_ID = "qwen2.5:7b"
 # Safety bound on tool/LLM turns so a confused model cannot loop forever.
 MAX_TURNS = 12
+
+
+@dataclass
+class LoopHooks:
+    """Agent-loop control hooks — a Python port of pi's AgentLoopConfig hooks.
+
+    Each is optional and may be sync or async. They give the harness real agency
+    over the loop without the model deciding control flow:
+
+    * ``transform_context(history)`` -> history  — shape context before the call
+    * ``before_tool_call(name, args)`` -> {"block": bool, "reason": str} | None
+    * ``after_tool_call(name, args, result)`` -> replacement result dict | None
+    * ``should_stop_after_turn(assistant_message, history)`` -> bool — graceful stop
+    * ``prepare_next_turn(assistant_message, history)`` -> {"thinking_level": ...} | None
+    """
+
+    transform_context: Optional[Callable] = None
+    before_tool_call: Optional[Callable] = None
+    after_tool_call: Optional[Callable] = None
+    should_stop_after_turn: Optional[Callable] = None
+    prepare_next_turn: Optional[Callable] = None
+
+
+async def _maybe_await(fn, *args):
+    if fn is None:
+        return None
+    result = fn(*args)
+    if inspect.isawaitable(result):
+        return await result
+    return result
 
 
 class AgentLoop:
@@ -145,24 +177,25 @@ class AgentLoop:
         system_prompt: str = "",
         tools: Optional[Iterable[AgentTool]] = None,
         thinking_level: str = "low",
+        hooks: Optional[LoopHooks] = None,
     ) -> AsyncGenerator[AgentEvent, None]:
         # AgentStartEvent is yielded before any network call (SC-004).
         yield AgentStartEvent()
 
+        hooks = hooks or LoopHooks()
         active_tools = list(tools) if tools is not None else self.tools
         tool_map = self._tool_map(active_tools)
         tool_schemas = [t.to_ollama_schema() for t in active_tools] or None
+        think_level = thinking_level
 
-        # Conversation history excludes the system prompt: the system message is
-        # supplied fresh on every API call, so it must not be persisted into the
-        # history we return (otherwise it would accumulate across turns).
+        # Conversation history excludes the system prompt (supplied fresh each call).
         history: list[dict] = list(getattr(session, "messages", None) or [])
         if prompt:
             history.append({"role": "user", "content": prompt})
 
-        def api_messages() -> list[dict]:
+        def api_messages(ctx: list[dict]) -> list[dict]:
             sys = [{"role": "system", "content": system_prompt}] if system_prompt else []
-            return sys + history
+            return sys + ctx
 
         try:
             client = self._client_lazy()
@@ -173,12 +206,14 @@ class AgentLoop:
 
                 yield TurnStartEvent()
 
+                # transform_context hook (pi: transformContext) — shape context.
+                ctx = await _maybe_await(hooks.transform_context, history) or history
+
                 assistant_text = ""
                 tool_calls: list = []
+                think_arg = think_level if think_level in ("low", "medium", "high") else None
 
-                think_arg = thinking_level if thinking_level in ("low", "medium", "high") else None
-
-                async for chunk in self._iter_chat(client, api_messages(), tool_schemas, think_arg):
+                async for chunk in self._iter_chat(client, api_messages(ctx), tool_schemas, think_arg):
                     if self.abort_event.is_set():
                         break
                     msg = getattr(chunk, "message", None)
@@ -190,7 +225,6 @@ class AgentLoop:
                     if getattr(msg, "tool_calls", None):
                         tool_calls.extend(msg.tool_calls)
 
-                # Record the assistant turn in history.
                 assistant_message: dict = {"role": "assistant", "content": assistant_text}
 
                 if tool_calls:
@@ -207,33 +241,51 @@ class AgentLoop:
                     assistant_message["tool_calls"] = serialised_calls
                     history.append(assistant_message)
 
-                    # Run each requested tool and feed results back to the model.
+                    terminate_flags = []
                     for call in serialised_calls:
                         name = call["function"]["name"]
                         args = call["function"]["arguments"]
                         yield ToolStartEvent(name=name, args=args)
-                        result = await self._execute_tool(name, args, tool_map)
+
+                        # before_tool_call hook (pi: beforeToolCall) — guard/block.
+                        guard = await _maybe_await(hooks.before_tool_call, name, args)
+                        if guard and guard.get("block"):
+                            result = {"error": "blocked", "reason": guard.get("reason", "blocked")}
+                        else:
+                            result = await self._execute_tool(name, args, tool_map)
+                        # after_tool_call hook (pi: afterToolCall) — transform result.
+                        replaced = await _maybe_await(hooks.after_tool_call, name, args, result)
+                        if replaced is not None:
+                            result = replaced
+
+                        terminate_flags.append(bool(isinstance(result, dict) and result.get("terminate")))
                         yield ToolEndEvent(name=name, result=result)
-                        history.append(
-                            {
-                                "role": "tool",
-                                "name": name,
-                                "content": json.dumps(result, ensure_ascii=False),
-                            }
-                        )
-                    # Loop again so the model can use the tool results.
+                        history.append({
+                            "role": "tool", "name": name,
+                            "content": json.dumps(result, ensure_ascii=False),
+                        })
+
+                    yield TurnEndEvent(message=assistant_message)
+
+                    # tool `terminate`: stop when every tool in the batch asked to.
+                    if terminate_flags and all(terminate_flags):
+                        break
+                    if await _maybe_await(hooks.should_stop_after_turn, assistant_message, history):
+                        break
+                    upd = await _maybe_await(hooks.prepare_next_turn, assistant_message, history)
+                    if upd and upd.get("thinking_level"):
+                        think_level = upd["thinking_level"]
                     continue
 
-                # No tool calls: this turn produced the final answer.
+                # No tool calls: final answer for this turn.
                 history.append(assistant_message)
                 yield TurnEndEvent(message=assistant_message)
 
-                # Honour any steering message queued during the turn.
+                if await _maybe_await(hooks.should_stop_after_turn, assistant_message, history):
+                    break
                 if not self.steering_queue.empty():
-                    steer_msg = await self.steering_queue.get()
-                    history.append({"role": "user", "content": steer_msg})
+                    history.append({"role": "user", "content": await self.steering_queue.get()})
                     continue
-
                 break
 
             yield AgentEndEvent(messages=history)
@@ -256,4 +308,4 @@ def create_loop(
     return AgentLoop(tools=tools, model_id=model_id, host=host)
 
 
-__all__ = ["AgentLoop", "AgentTool", "DEFAULT_MODEL_ID", "create_loop"]
+__all__ = ["AgentLoop", "AgentTool", "LoopHooks", "DEFAULT_MODEL_ID", "create_loop"]
