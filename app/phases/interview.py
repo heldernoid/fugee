@@ -153,29 +153,53 @@ def _next_index(session: SessionState, idx: int) -> int:
     return j
 
 
-def control_updates(session: SessionState, idx: int):
-    """(radio, multi, country, text) updates for the question at ``idx``."""
+def _active_control(session: SessionState, idx: int):
+    """Return (which, choices) for the active control at ``idx``.
+    which ∈ {"radio","multi","country","text"}."""
     lang = session.language
-    if idx == CORRECT_INDEX:  # free-text correction
-        return (gr.update(visible=False), gr.update(visible=False), gr.update(visible=False),
-                gr.update(visible=True, value=""))
+    if idx == CORRECT_INDEX:
+        return "text", None
     if idx >= REVIEW_INDEX:
-        choices = [t(lang, "review_yes"), t(lang, "review_no")]
-        return (gr.update(visible=True, choices=choices, value=None),
-                gr.update(visible=False), gr.update(visible=False), gr.update(visible=False))
+        return "radio", [t(lang, "review_yes"), t(lang, "review_no")]
     q = QUESTIONS[idx]
     if q.control == "yesno":
-        return (gr.update(visible=True, choices=option_labels(lang, q), value=None),
-                gr.update(visible=False), gr.update(visible=False), gr.update(visible=False))
+        return "radio", option_labels(lang, q)
     if q.control == "choice":
-        return (gr.update(visible=False),
-                gr.update(visible=True, choices=option_labels(lang, q), value=[]),
-                gr.update(visible=False), gr.update(visible=False))
+        return "multi", option_labels(lang, q)
     if q.control == "country":
-        return (gr.update(visible=False), gr.update(visible=False),
-                gr.update(visible=True, value=None), gr.update(visible=False))
-    return (gr.update(visible=False), gr.update(visible=False), gr.update(visible=False),
-            gr.update(visible=True, value=""))
+        return "country", None
+    return "text", None
+
+
+def control_updates(session: SessionState, idx: int):
+    """(radio, multi, country, text) updates: active control visible + populated."""
+    which, choices = _active_control(session, idx)
+    return (
+        gr.update(visible=which == "radio", choices=choices if which == "radio" else None, value=None),
+        gr.update(visible=which == "multi", choices=choices if which == "multi" else None, value=[]),
+        gr.update(visible=which == "country", value=None),
+        gr.update(visible=which == "text", value=""),
+    )
+
+
+def control_frames(session: SessionState, idx: int):
+    """Two passes that defeat Gradio's choices-on-reveal lag:
+    pass 1 sets the choices on the active control while it is still hidden,
+    pass 2 simply reveals it. Returns (hidden_with_choices, reveal)."""
+    which, choices = _active_control(session, idx)
+    hidden = (
+        gr.update(visible=False, choices=choices if which == "radio" else None, value=None),
+        gr.update(visible=False, choices=choices if which == "multi" else None, value=[]),
+        gr.update(visible=False, value=None),
+        gr.update(visible=False, value=""),
+    )
+    reveal = (
+        gr.update(visible=which == "radio"),
+        gr.update(visible=which == "multi"),
+        gr.update(visible=which == "country"),
+        gr.update(visible=which == "text"),
+    )
+    return hidden, reveal
 
 
 def _store(session: SessionState, q: Question, radio_v, multi_v, country_v, text_v):
@@ -388,12 +412,13 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
               gr.update(visible=False), gr.update(visible=False))
 
     def _frames(o, loop):
-        """Two render passes: show the new question with controls hidden, then
-        reveal the control. Splitting the transition makes Gradio render the
-        choice controls immediately instead of one Continue-press late."""
+        """Two render passes (see control_frames): pass 1 sets choices while the
+        control is hidden, pass 2 reveals it — so choice controls render at once."""
+        session, idx = o[6], o[7]
+        hidden, reveal = control_frames(session, idx)
         return [
-            (o[0], o[1], *_HIDE4, o[6], loop, o[7]),
-            (o[0], o[1], o[2], o[3], o[4], o[5], o[6], loop, o[7]),
+            (o[0], o[1], *hidden, session, loop, idx),
+            (o[0], o[1], *reveal, session, loop, idx),
         ]
 
     async def start(session, loop, slot_idx=0):

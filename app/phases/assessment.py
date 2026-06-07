@@ -289,7 +289,7 @@ def build(visible: bool = False, session_st: gr.State | None = None, loop_st: gr
             # keep the proceed button hidden while reasoning streams
             yield facts_html, reason_html, progress_html, gr.update(visible=False), session
         # done — let the person read, then choose to continue
-        yield last[0], last[1], last[2], gr.update(visible=True), session
+        yield last[0], last[1], last[2], gr.update(visible=True, value="See your recommendations →"), session
 
     return AssessmentUI(
         column=column, facts=facts, reason=reason, progress=progress, proceed=proceed,
