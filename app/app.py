@@ -22,7 +22,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import gradio as gr  # noqa: E402
 
+from app.config import load_env  # noqa: E402
 from app.design_tokens import root_css  # noqa: E402
+
+# Load .env (OLLAMA_HOST, MODEL_ID, …) before anything reads the environment.
+load_env()
 
 # Web fonts: Fraunces (display serif) + Inter (UI sans) per DESIGN.md §3.
 FONT_IMPORT = (
