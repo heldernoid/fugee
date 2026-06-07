@@ -299,18 +299,24 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
     loop_st = loop_st or gr.State(None)
     slot_idx_st = slot_idx_st or gr.State(0)
 
-    with gr.Column(elem_id="iv-screen", visible=visible) as column:
-        rail = gr.HTML(render_rail(State.SITUATION))
-        chat = gr.HTML(render_chat([], thinking=True))
-        with gr.Column(elem_id="iv-responder"):
-            gr.HTML('<div class="label-row">Your answer</div>')
-            radio = gr.Radio(choices=[], label="", show_label=False, visible=False, elem_id="iv-choice")
-            multi = gr.CheckboxGroup(choices=[], label="", show_label=False, visible=False, elem_id="iv-multi")
-            country = gr.Dropdown(choices=country_choices(), label="", show_label=False, visible=False,
-                                  allow_custom_value=True, filterable=True, elem_id="iv-country")
-            text = gr.Textbox(label="", show_label=False, lines=3, visible=True,
-                              placeholder="Type your answer here…", elem_id="iv-text")
-            cont = gr.Button("Continue →", elem_id="iv-continue")
+    with gr.Column(visible=visible) as column:
+        gr.HTML(
+            '<div class="phase-head"><span class="ptag">Phase 2 — Structured Interview</span>'
+            '<span class="pdesc">A calm, one-question-at-a-time conversation. Refuge offers the '
+            "right kind of answer control for each question.</span></div>"
+        )
+        with gr.Column(elem_id="iv-screen"):
+            rail = gr.HTML(render_rail(State.SITUATION))
+            chat = gr.HTML(render_chat([], thinking=True))
+            with gr.Column(elem_id="iv-responder"):
+                gr.HTML('<div class="label-row">Your answer</div>')
+                radio = gr.Radio(choices=[], label="", show_label=False, visible=False, elem_id="iv-choice")
+                multi = gr.CheckboxGroup(choices=[], label="", show_label=False, visible=False, elem_id="iv-multi")
+                country = gr.Dropdown(choices=country_choices(), label="", show_label=False, visible=False,
+                                      allow_custom_value=True, filterable=True, elem_id="iv-country")
+                text = gr.Textbox(label="", show_label=False, lines=3, visible=True,
+                                  placeholder="Type your answer here…", elem_id="iv-text")
+                cont = gr.Button("Continue →", elem_id="iv-continue")
 
     stream_outputs = [chat, rail, radio, multi, country, text, session_st, loop_st, slot_idx_st]
 

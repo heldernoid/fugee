@@ -227,23 +227,29 @@ def build(visible: bool = False, session_st: gr.State | None = None) -> Recommen
     session_st = session_st or gr.State(None)
     slots, cards, btns = [], [], []
 
-    with gr.Column(elem_id="reco-screen", visible=visible) as column:
+    with gr.Column(visible=visible) as column:
         gr.HTML(
-            '<p class="reco__intro">Based on your situation, these are the safest and '
-            "most achievable options near you. Each is matched to your profile — not a "
-            "generic ranking.</p>"
+            '<div class="phase-head"><span class="ptag">Phase 4 — Recommendations &amp; Action Plan</span>'
+            '<span class="pdesc">Clear options, ranked and explained — followed by a concrete, '
+            "step-by-step roadmap for the country you choose.</span></div>"
         )
-        with gr.Row(elem_id="reco-cards"):
-            for i in range(MAX_CARDS):
-                with gr.Column(elem_classes=["ccard-slot"], visible=False) as slot:
-                    card = gr.HTML("")
-                    btn = gr.Button("Select this country", elem_classes=["btn-card-select"])
-                slots.append(slot)
-                cards.append(card)
-                btns.append(btn)
-        roadmap = gr.HTML(roadmap_html(None))
-        with gr.Row(elem_id="reco-proceed-row"):
-            proceed = gr.Button("Prepare my documents →", elem_id="reco-proceed")
+        with gr.Column(elem_id="reco-screen"):
+            gr.HTML(
+                '<p class="reco__intro">Based on your situation, these are the safest and '
+                "most achievable options near you. Each is matched to your profile — not a "
+                "generic ranking.</p>"
+            )
+            with gr.Row(elem_id="reco-cards"):
+                for i in range(MAX_CARDS):
+                    with gr.Column(elem_classes=["ccard-slot"], visible=False) as slot:
+                        card = gr.HTML("")
+                        btn = gr.Button("Select this country", elem_classes=["btn-card-select"])
+                    slots.append(slot)
+                    cards.append(card)
+                    btns.append(btn)
+            roadmap = gr.HTML(roadmap_html(None))
+            with gr.Row(elem_id="reco-proceed-row"):
+                proceed = gr.Button("Prepare my documents →", elem_id="reco-proceed")
 
     render_outputs = []
     for i in range(MAX_CARDS):

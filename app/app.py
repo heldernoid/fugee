@@ -54,8 +54,9 @@ GLOBAL_CSS = """
 footer { display: none !important; }
 body, .gradio-container { background: var(--bg) !important; color: var(--text);
   font-family: var(--font-ui); }
-.gradio-container { max-width: var(--maxw) !important; margin: 0 auto !important;
-  padding-top: var(--s-xl); padding-bottom: var(--s-xl); }
+/* Wide shell like the mockup (main = 1180px); narrow screens cap themselves. */
+.gradio-container { max-width: 1180px !important; margin: 0 auto !important;
+  padding: 0 clamp(16px,4vw,32px) var(--s-xxl) !important; }
 .gradio-container button, .gradio-container input,
 .gradio-container textarea, .gradio-container select { font-family: var(--font-ui); }
 
@@ -65,10 +66,28 @@ body, .gradio-container { background: var(--bg) !important; color: var(--text);
 .gradio-container .form { background: transparent !important; border: none !important;
   box-shadow: none !important; }
 .gradio-container .gap { gap: var(--s-sm); }
-
-/* visible focus ring on every control (DESIGN.md accessibility) */
 .gradio-container :focus-visible { outline: 3px solid var(--accent) !important;
   outline-offset: 2px; border-radius: var(--r-sm); }
+
+/* Site bar (mockup chrome) */
+#site-bar { position:sticky; top:0; z-index:50; background:rgba(247,245,240,.86);
+  backdrop-filter:saturate(140%) blur(10px); border-bottom:1px solid var(--line);
+  margin:0 calc(-1 * clamp(16px,4vw,32px)) var(--s-xl); padding:14px clamp(16px,4vw,32px); }
+#site-bar .inner { display:flex; align-items:center; gap:12px; max-width:1180px; margin:0 auto; }
+#site-bar .name { font-family:var(--font-display); font-weight:600; font-size:21px;
+  letter-spacing:-.01em; color:var(--primary-deep); }
+#site-bar .tag { font-size:12px; color:var(--text-muted); letter-spacing:.04em;
+  text-transform:uppercase; padding-left:10px; margin-left:2px; border-left:1px solid var(--line-strong); }
+#site-bar .nav { margin-left:auto; display:flex; gap:2px; }
+#site-bar .nav span { font-size:13px; font-weight:500; color:var(--text-secondary);
+  padding:7px 12px; border-radius:var(--r-full); white-space:nowrap; }
+@media(max-width:860px){ #site-bar .nav, #site-bar .tag { display:none; } }
+
+/* Per-phase header (tag + description), like the mockup */
+.phase-head { display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; margin-bottom:var(--s-lg); }
+.phase-head .ptag { font-size:11.5px; font-weight:600; letter-spacing:.13em; text-transform:uppercase;
+  color:var(--primary); background:var(--primary-tint); padding:5px 11px; border-radius:var(--r-full); white-space:nowrap; }
+.phase-head .pdesc { font-size:14px; color:var(--text-muted); max-width:52ch; }
 """
 
 APP_CSS = (
@@ -83,6 +102,27 @@ APP_CSS = (
 )
 
 
+_LOGO_SVG = (
+    '<svg width="28" height="28" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="15" fill="#0E6A58"/>'
+    '<path d="M16 7l7 6.5V25h-4.6v-6.2h-4.8V25H9V13.5L16 7z" fill="#fff"/>'
+    '<circle cx="16" cy="13.6" r="1.7" fill="#E07B39"/></svg>'
+)
+SITE_BAR_HTML = f"""
+<header id="site-bar"><div class="inner">
+  {_LOGO_SVG}
+  <span class="name">Refuge</span>
+  <span class="tag">Safe guidance for people on the move</span>
+  <nav class="nav"><span>Intake</span><span>Interview</span><span>Assessment</span>
+    <span>Recommendations</span><span>Documents</span></nav>
+</div></header>
+"""
+
+
+def phase_header(tag: str, desc: str) -> str:
+    """The 'PHASE N — TITLE' tag + description shown above a phase screen."""
+    return f'<div class="phase-head"><span class="ptag">{tag}</span><span class="pdesc">{desc}</span></div>'
+
+
 def _confirmed_review(session) -> bool:
     """True when the person has just confirmed the review summary."""
     if session is None or session.state != State.REVIEW:
@@ -95,6 +135,7 @@ def _confirmed_review(session) -> bool:
 
 def build_app() -> gr.Blocks:
     with gr.Blocks(title="Refuge", analytics_enabled=False) as demo:
+        gr.HTML(SITE_BAR_HTML)
         # Session + loop state shared across phases so each screen sees the same
         # session object.
         session_st = gr.State(None)

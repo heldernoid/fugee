@@ -165,16 +165,22 @@ def build(visible: bool = True) -> IntakeUI:
     """Build the intake screen inside the current gr.Blocks context."""
     selected_lang = gr.State(None)
 
-    with gr.Column(elem_id="intake-screen", visible=visible) as column:
-        gr.HTML(_HEADER_HTML)
-        with gr.Row(elem_id="intake-langs"):
-            pills = [
-                gr.Button(native, elem_classes=["lang"], scale=0)
-                for native, _english in LANGUAGES
-            ]
-        with gr.Row(elem_classes=["intake-cta"]):
-            begin = gr.Button("Begin", elem_id="intake-begin", interactive=False)
-        gr.HTML(_TRUST_HTML)
+    with gr.Column(visible=visible) as column:
+        gr.HTML(
+            '<div class="phase-head"><span class="ptag">Phase 1 — Intake</span>'
+            '<span class="pdesc">A calm welcome. You choose a language you trust before '
+            "anything else is asked.</span></div>"
+        )
+        with gr.Column(elem_id="intake-screen"):
+            gr.HTML(_HEADER_HTML)
+            with gr.Row(elem_id="intake-langs"):
+                pills = [
+                    gr.Button(native, elem_classes=["lang"], scale=0)
+                    for native, _english in LANGUAGES
+                ]
+            with gr.Row(elem_classes=["intake-cta"]):
+                begin = gr.Button("Begin", elem_id="intake-begin", interactive=False)
+            gr.HTML(_TRUST_HTML)
 
     def _on_pill(clicked: str, current: str | None):
         new_selected = toggle_selection(clicked, current)

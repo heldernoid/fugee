@@ -81,25 +81,31 @@ def _checklist_values(session: SessionState) -> list[str]:
 def build(visible: bool = False, session_st: gr.State | None = None) -> DocumentsUI:
     session_st = session_st or gr.State(None)
 
-    with gr.Column(elem_id="docs-screen", visible=visible) as column:
-        with gr.Row(elem_classes=["pkg"]):
-            with gr.Column(elem_classes=["pkg__preview"]):
-                gr.HTML('<p class="pkg__lbl">Preview · Personal statement</p>')
-                preview = gr.HTML('<article class="doc"></article>')
-            with gr.Column(elem_classes=["pkg__side"]):
-                gr.HTML('<p class="pkg__lbl">Evidence to gather</p>')
-                checklist = gr.CheckboxGroup(
-                    choices=[label for label, _s, _k in CHECKLIST],
-                    value=[], label="", elem_id="docs-checklist",
-                )
-                gr.HTML('<p class="pkg__lbl">Your files</p>')
-                files = gr.File(label="", interactive=False, elem_id="docs-files")
-                download_all = gr.DownloadButton(
-                    "⤓ Download all (4 files)", elem_id="docs-download", visible=False
-                )
-                start_over = gr.Button(
-                    "↺ Start over for a different country", elem_id="docs-startover"
-                )
+    with gr.Column(visible=visible) as column:
+        gr.HTML(
+            '<div class="phase-head"><span class="ptag">Phase 5 — Document Package</span>'
+            '<span class="pdesc">Everything gathered into a package you can download, print, '
+            "and carry — pre-filled and ready.</span></div>"
+        )
+        with gr.Column(elem_id="docs-screen"):
+            with gr.Row(elem_classes=["pkg"]):
+                with gr.Column(elem_classes=["pkg__preview"]):
+                    gr.HTML('<p class="pkg__lbl">Preview · Personal statement</p>')
+                    preview = gr.HTML('<article class="doc"></article>')
+                with gr.Column(elem_classes=["pkg__side"]):
+                    gr.HTML('<p class="pkg__lbl">Evidence to gather</p>')
+                    checklist = gr.CheckboxGroup(
+                        choices=[label for label, _s, _k in CHECKLIST],
+                        value=[], label="", elem_id="docs-checklist",
+                    )
+                    gr.HTML('<p class="pkg__lbl">Your files</p>')
+                    files = gr.File(label="", interactive=False, elem_id="docs-files")
+                    download_all = gr.DownloadButton(
+                        "⤓ Download all (4 files)", elem_id="docs-download", visible=False
+                    )
+                    start_over = gr.Button(
+                        "↺ Start over for a different country", elem_id="docs-startover"
+                    )
 
     render_outputs = [preview, checklist, files, download_all]
 

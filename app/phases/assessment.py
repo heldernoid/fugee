@@ -242,12 +242,18 @@ def build(visible: bool = False, session_st: gr.State | None = None, loop_st: gr
     session_st = session_st or gr.State(None)
     loop_st = loop_st or gr.State(None)
 
-    with gr.Column(elem_id="assess-screen", visible=visible) as column:
-        with gr.Row(elem_classes=["assess"]):
-            facts = gr.HTML('<aside class="assess__facts"></aside>')
-            with gr.Column(elem_classes=["assess__reason"]):
-                progress = gr.HTML(render_progress(0, ""))
-                reason = gr.HTML('<div class="reason-doc"></div>')
+    with gr.Column(visible=visible) as column:
+        gr.HTML(
+            '<div class="phase-head"><span class="ptag">Phase 3 — Situation Assessment</span>'
+            "<span class=\"pdesc\">Refuge's reasoning is shown, not hidden — you can watch a "
+            "thoughtful case being worked through.</span></div>"
+        )
+        with gr.Column(elem_id="assess-screen"):
+            with gr.Row(elem_classes=["assess"]):
+                facts = gr.HTML('<aside class="assess__facts"></aside>')
+                with gr.Column(elem_classes=["assess__reason"]):
+                    progress = gr.HTML(render_progress(0, ""))
+                    reason = gr.HTML('<div class="reason-doc"></div>')
 
     outputs = [facts, reason, progress, session_st]
 
