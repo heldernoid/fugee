@@ -230,17 +230,25 @@ class InterviewUI:
     start_fn: callable
     start_inputs: list
     stream_outputs: list
+    continue_btn: gr.Button
+    continue_event: object  # the cont.click dependency, for .then() chaining
 
 
-def build(visible: bool = True) -> InterviewUI:
+def build(
+    visible: bool = True,
+    session_st: gr.State | None = None,
+    loop_st: gr.State | None = None,
+    spec_st: gr.State | None = None,
+) -> InterviewUI:
     """Build the interview screen inside the current gr.Blocks context.
 
     ``visible`` starts the screen hidden when the intake screen precedes it
-    (Phase 2 navigation).
+    (Phase 2 navigation). The session/loop states may be shared across phases
+    so the assessment screen sees the same session.
     """
-    session_st = gr.State(None)
-    loop_st = gr.State(None)
-    spec_st = gr.State(ResponderSpec())
+    session_st = session_st or gr.State(None)
+    loop_st = loop_st or gr.State(None)
+    spec_st = spec_st or gr.State(ResponderSpec())
 
     with gr.Column(elem_id="iv-screen", visible=visible) as column:
         rail = gr.HTML(render_rail(State.SITUATION))
@@ -343,7 +351,7 @@ def build(visible: bool = True) -> InterviewUI:
         yield (render_chat(session.messages), render_rail(session.state), *r_up,
                session, loop, new_spec)
 
-    cont.click(
+    continue_event = cont.click(
         on_continue,
         inputs=[radio, multi, country, text, session_st, loop_st, spec_st],
         outputs=stream_outputs,
@@ -357,6 +365,8 @@ def build(visible: bool = True) -> InterviewUI:
         start_fn=start,
         start_inputs=[session_st, loop_st],
         stream_outputs=stream_outputs,
+        continue_btn=cont,
+        continue_event=continue_event,
     )
 
 

@@ -30,6 +30,7 @@ CSS_SOURCES = [
     REPO_ROOT / "app" / "app.py",
     REPO_ROOT / "app" / "phases" / "intake.py",
     REPO_ROOT / "app" / "phases" / "interview.py",
+    REPO_ROOT / "app" / "phases" / "assessment.py",
 ]
 
 _ROOT_DEF_RE = re.compile(r"--([a-z0-9-]+):\s*([^;]+);")

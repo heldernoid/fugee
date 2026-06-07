@@ -26,9 +26,10 @@ import gradio as gr  # noqa: E402
 from agent.loop import create_loop  # noqa: E402
 from app.config import load_env  # noqa: E402
 from app.design_tokens import root_css  # noqa: E402
+from app.phases import assessment as assessment_phase  # noqa: E402
 from app.phases import intake as intake_phase  # noqa: E402
 from app.phases import interview as interview_phase  # noqa: E402
-from app.state.session import SessionState  # noqa: E402
+from app.state.session import SessionState, State  # noqa: E402
 
 # Load .env (OLLAMA_HOST, MODEL_ID, …) before anything reads the environment.
 load_env()
@@ -69,14 +70,31 @@ APP_CSS = (
     + root_css() + "\n"
     + GLOBAL_CSS + "\n"
     + intake_phase.INTAKE_CSS + "\n"
-    + interview_phase.INTERVIEW_CSS
+    + interview_phase.INTERVIEW_CSS + "\n"
+    + assessment_phase.ASSESSMENT_CSS
 )
+
+
+def _confirmed_review(session) -> bool:
+    """True when the person has just confirmed the review summary."""
+    if session is None or session.state != State.REVIEW:
+        return False
+    users = [m for m in session.messages if m.get("role") == "user"]
+    if not users:
+        return False
+    return users[-1].get("content", "").strip().lower().startswith("yes")
 
 
 def build_app() -> gr.Blocks:
     with gr.Blocks(title="Refuge", analytics_enabled=False) as demo:
+        # Session + loop state shared across phases so each screen sees the same
+        # session object.
+        session_st = gr.State(None)
+        loop_st = gr.State(None)
+
         intake_ui = intake_phase.build(visible=True)
-        interview_ui = interview_phase.build(visible=False)
+        interview_ui = interview_phase.build(visible=False, session_st=session_st, loop_st=loop_st)
+        assess_ui = assessment_phase.build(visible=False, session_st=session_st, loop_st=loop_st)
 
         async def begin(lang, session, loop):
             if not lang:
@@ -94,6 +112,24 @@ def build_app() -> gr.Blocks:
             inputs=[intake_ui.selected_lang, interview_ui.session, interview_ui.loop],
             outputs=[intake_ui.column, interview_ui.column, *interview_ui.stream_outputs],
         )
+
+        async def maybe_assess(session, loop):
+            # Triggered after each interview turn; runs only once the review is
+            # confirmed, then hands off to the assessment screen.
+            if not _confirmed_review(session):
+                return
+            async for facts_html, reason_html, progress_html, sess in assess_ui.start_fn(session, loop):
+                yield (gr.update(visible=False), gr.update(visible=True),
+                       facts_html, reason_html, progress_html, sess)
+
+        # After each interview turn completes, check whether the review was
+        # confirmed and, if so, hand off to the assessment screen.
+        interview_ui.continue_event.then(
+            maybe_assess,
+            inputs=[session_st, loop_st],
+            outputs=[interview_ui.column, assess_ui.column, *assess_ui.outputs],
+        )
+
     return demo
 
 
