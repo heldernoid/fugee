@@ -153,14 +153,16 @@ class AgentLoop:
         tool_map = self._tool_map(active_tools)
         tool_schemas = [t.to_ollama_schema() for t in active_tools] or None
 
-        # Build the message list: system prompt, prior history, new prompt.
-        messages: list[dict] = []
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-        prior = list(getattr(session, "messages", None) or [])
-        messages.extend(prior)
+        # Conversation history excludes the system prompt: the system message is
+        # supplied fresh on every API call, so it must not be persisted into the
+        # history we return (otherwise it would accumulate across turns).
+        history: list[dict] = list(getattr(session, "messages", None) or [])
         if prompt:
-            messages.append({"role": "user", "content": prompt})
+            history.append({"role": "user", "content": prompt})
+
+        def api_messages() -> list[dict]:
+            sys = [{"role": "system", "content": system_prompt}] if system_prompt else []
+            return sys + history
 
         try:
             client = self._client_lazy()
@@ -176,7 +178,7 @@ class AgentLoop:
 
                 think_arg = thinking_level if thinking_level in ("low", "medium", "high") else None
 
-                async for chunk in self._iter_chat(client, messages, tool_schemas, think_arg):
+                async for chunk in self._iter_chat(client, api_messages(), tool_schemas, think_arg):
                     if self.abort_event.is_set():
                         break
                     msg = getattr(chunk, "message", None)
@@ -203,7 +205,7 @@ class AgentLoop:
                                 args = {}
                         serialised_calls.append({"function": {"name": fn.name, "arguments": args}})
                     assistant_message["tool_calls"] = serialised_calls
-                    messages.append(assistant_message)
+                    history.append(assistant_message)
 
                     # Run each requested tool and feed results back to the model.
                     for call in serialised_calls:
@@ -212,7 +214,7 @@ class AgentLoop:
                         yield ToolStartEvent(name=name, args=args)
                         result = await self._execute_tool(name, args, tool_map)
                         yield ToolEndEvent(name=name, result=result)
-                        messages.append(
+                        history.append(
                             {
                                 "role": "tool",
                                 "name": name,
@@ -223,21 +225,35 @@ class AgentLoop:
                     continue
 
                 # No tool calls: this turn produced the final answer.
-                messages.append(assistant_message)
+                history.append(assistant_message)
                 yield TurnEndEvent(message=assistant_message)
 
                 # Honour any steering message queued during the turn.
                 if not self.steering_queue.empty():
                     steer_msg = await self.steering_queue.get()
-                    messages.append({"role": "user", "content": steer_msg})
+                    history.append({"role": "user", "content": steer_msg})
                     continue
 
                 break
 
-            yield AgentEndEvent(messages=messages)
+            yield AgentEndEvent(messages=history)
 
         except Exception as exc:  # noqa: BLE001 — surfaced to UI, never raised through
             yield ErrorEvent(message=f"{type(exc).__name__}: {exc}")
 
 
-__all__ = ["AgentLoop", "AgentTool", "DEFAULT_MODEL_ID"]
+def create_loop(
+    tools: Optional[Iterable[AgentTool]] = None,
+    model_id: Optional[str] = None,
+    host: Optional[str] = None,
+) -> AgentLoop:
+    """Factory: a fresh, isolated AgentLoop for one Gradio session (T019).
+
+    Each session must call this to get its own loop instance — the steering
+    queue and abort flag are per-instance, so concurrent sessions never share
+    mutable state.
+    """
+    return AgentLoop(tools=tools, model_id=model_id, host=host)
+
+
+__all__ = ["AgentLoop", "AgentTool", "DEFAULT_MODEL_ID", "create_loop"]

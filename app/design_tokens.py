@@ -1,13 +1,17 @@
 """app/design_tokens.py — single source for DESIGN.md tokens in Python.
 
-DESIGN.md is the canonical design system (CLAUDE.md Design Rule 7). To guarantee
-the Gradio app can never drift from it, both the app's injected ``:root`` CSS
-block and the T010 token validator are derived from this one parser. No hardcoded
-hex values live in the Python UI code (ARCHITECTURE.md §4 theming contract).
+DESIGN.md is the canonical design system (CLAUDE.md Design Rule 7) and
+``mockup.html`` is the visual reference. To guarantee the Gradio app matches
+both, this module parses DESIGN.md's YAML frontmatter and emits CSS custom
+properties using the **same variable names as mockup.html** (``--primary``,
+``--bg``, ``--text``, ``--r-md``, ``--s-md`` …). That way the phase CSS can be
+lifted from the mockup verbatim and stay token-faithful.
 
-The parser reads the YAML frontmatter of DESIGN.md without a YAML dependency —
-it only needs the flat ``colors``, ``typography`` (font families), ``rounded``,
-and ``spacing`` maps, all of which are simple ``key: "value"`` lines.
+A few tokens that mockup.html uses live in DESIGN.md prose (§4 Layout, §5
+Elevation) rather than the frontmatter — the shadows and the max reading width.
+Those are declared here as ``PROSE_TOKENS`` with their DESIGN.md source noted.
+
+No hardcoded hex values live in the Python UI code (ARCHITECTURE.md §4).
 """
 
 from __future__ import annotations
@@ -15,35 +19,42 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-# Repo root = two levels up from this file (app/ -> repo).
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DESIGN_MD = REPO_ROOT / "DESIGN.md"
 
-# Sections of the frontmatter we map to CSS custom properties, and the prefix
-# each becomes under :root.
-_SECTION_PREFIX = {
-    "colors": "color",
-    "rounded": "radius",
-    "spacing": "space",
-}
+# DESIGN.md frontmatter sections we lift, and how each key becomes a CSS var.
+# Most keys map to "<prefix><key>"; a few colours are renamed to match the
+# mockup's shorter names (background -> bg, text-primary -> text).
+_COLOR_RENAME = {"background": "bg", "text-primary": "text"}
+_PREFIX = {"rounded": "r-", "spacing": "s-"}
 
-# Within typography we only lift the two font-family declarations to vars.
+# Typography keys lifted as font-family vars.
 _FONT_KEYS = {"font-display", "font-ui"}
+
+# Tokens defined in DESIGN.md prose (not frontmatter) but used by mockup.html.
+#   shadows  -> DESIGN.md §5 Elevation & Depth
+#   maxw     -> DESIGN.md §4 Layout (max content width 780px)
+PROSE_TOKENS: dict[str, str] = {
+    "shadow-sm": "0 1px 2px rgba(13,46,38,.06), 0 1px 1px rgba(13,46,38,.04)",
+    "shadow-md": "0 6px 20px rgba(13,46,38,.08)",
+    "shadow-lg": "0 18px 48px rgba(13,46,38,.12)",
+    "maxw": "780px",
+}
 
 _SECTION_RE = re.compile(r"^([a-z0-9-]+):\s*$")
 _KV_RE = re.compile(r'^\s+([a-z0-9-]+):\s*"(.*?)"')
 
 
 def load_tokens(design_md: Path | None = None) -> dict[str, str]:
-    """Parse DESIGN.md frontmatter into a flat {css-var-name: value} map.
+    """Parse DESIGN.md into a flat {css-var-name: value} map (mockup naming).
 
-    Keys are the full CSS custom property names without the leading ``--``,
-    e.g. ``color-primary``, ``font-display``, ``radius-md``, ``space-lg``.
+    Keys are CSS custom-property names without the leading ``--`` — e.g.
+    ``primary``, ``bg``, ``text``, ``r-md``, ``s-lg``, ``font-display`` — plus
+    the prose-sourced ``shadow-*`` and ``maxw`` tokens.
     """
     path = design_md or DESIGN_MD
     text = path.read_text(encoding="utf-8")
 
-    # Frontmatter is the first block fenced by --- ... ---.
     if text.startswith("---"):
         end = text.find("\n---", 3)
         frontmatter = text[3:end] if end != -1 else text
@@ -66,11 +77,14 @@ def load_tokens(design_md: Path | None = None) -> dict[str, str]:
             continue
         key, value = kv.group(1), kv.group(2)
 
-        if section in _SECTION_PREFIX:
-            tokens[f"{_SECTION_PREFIX[section]}-{key}"] = value
+        if section == "colors":
+            tokens[_COLOR_RENAME.get(key, key)] = value
+        elif section in _PREFIX:
+            tokens[f"{_PREFIX[section]}{key}"] = value
         elif section == "typography" and key in _FONT_KEYS:
             tokens[key] = value
 
+    tokens.update(PROSE_TOKENS)
     return tokens
 
 
@@ -81,4 +95,4 @@ def root_css(design_md: Path | None = None) -> str:
     return ":root {\n" + "\n".join(lines) + "\n}"
 
 
-__all__ = ["load_tokens", "root_css", "DESIGN_MD", "REPO_ROOT"]
+__all__ = ["load_tokens", "root_css", "PROSE_TOKENS", "DESIGN_MD", "REPO_ROOT"]
