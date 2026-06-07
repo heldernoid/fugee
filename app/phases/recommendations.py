@@ -47,10 +47,10 @@ details.prep ul { margin:11px 0 0; padding:0; list-style:none; display:flex; fle
 details.prep li { font-size:13.5px; color:var(--text-secondary); display:flex; gap:9px; line-height:1.45; }
 details.prep li::before { content:""; flex:0 0 auto; width:6px; height:6px; border-radius:50%; background:var(--accent); margin-top:7px; }
 
-.ccard-slot .btn-card-select button { width:100% !important; border-radius:var(--r-md) !important; font-weight:600 !important;
+.ccard-slot .btn-card-select, .ccard-slot .btn-card-select button { width:100% !important; border-radius:var(--r-md) !important; font-weight:600 !important;
   background:var(--surface) !important; color:var(--primary-deep) !important; border:1px solid var(--line-strong) !important; box-shadow:none !important; }
-.ccard-slot .btn-card-select button:hover { border-color:var(--primary) !important; background:var(--primary-tint) !important; }
-.ccard-slot.is-selected .btn-card-select button { background:var(--primary) !important; color:var(--on-primary) !important;
+.ccard-slot .btn-card-select:hover, .ccard-slot .btn-card-select button:hover { border-color:var(--primary) !important; background:var(--primary-tint) !important; }
+.ccard-slot.is-selected .btn-card-select, .ccard-slot.is-selected .btn-card-select button { background:var(--primary) !important; color:var(--on-primary) !important;
   border-color:var(--primary) !important; box-shadow:0 2px 0 var(--primary-deep) !important; }
 
 #reco-roadmap { margin-top:30px; background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-lg); padding:clamp(18px,4vw,26px); }
@@ -67,6 +67,11 @@ details.prep li::before { content:""; flex:0 0 auto; width:6px; height:6px; bord
 .step__body p { font-size:14px; color:var(--text-secondary); margin:0 0 7px; }
 .step__meta { display:flex; gap:8px; flex-wrap:wrap; }
 .tag-s { font-size:12px; font-weight:500; color:var(--text-secondary); background:var(--surface); border:1px solid var(--line); padding:3px 10px; border-radius:var(--r-full); display:inline-flex; align-items:center; gap:6px; }
+#reco-proceed-row { margin-top:24px; justify-content:center; }
+#reco-proceed, #reco-proceed button { background:var(--accent) !important; color:var(--on-accent) !important;
+  box-shadow:0 2px 0 var(--accent-deep) !important; border:0 !important; font-weight:600 !important;
+  border-radius:var(--r-md) !important; padding:14px 26px !important; }
+#reco-proceed:hover, #reco-proceed button:hover { background:var(--accent-deep) !important; }
 """
 
 
@@ -215,6 +220,7 @@ class RecommendationsUI:
     render_outputs: list  # [slot,card,btn]*MAX_CARDS + [roadmap]
     populate: callable     # (session) -> list of updates for render_outputs
     session: gr.State
+    proceed: gr.Button     # "Prepare my documents" -> Phase 5
 
 
 def build(visible: bool = False, session_st: gr.State | None = None) -> RecommendationsUI:
@@ -236,6 +242,8 @@ def build(visible: bool = False, session_st: gr.State | None = None) -> Recommen
                 cards.append(card)
                 btns.append(btn)
         roadmap = gr.HTML(roadmap_html(None))
+        with gr.Row(elem_id="reco-proceed-row"):
+            proceed = gr.Button("Prepare my documents →", elem_id="reco-proceed")
 
     render_outputs = []
     for i in range(MAX_CARDS):
@@ -282,6 +290,7 @@ def build(visible: bool = False, session_st: gr.State | None = None) -> Recommen
 
     return RecommendationsUI(
         column=column, render_outputs=render_outputs, populate=populate, session=session_st,
+        proceed=proceed,
     )
 
 

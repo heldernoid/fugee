@@ -98,12 +98,9 @@ INTERVIEW_CSS = """
 
 /* Native Gradio controls themed to match the responder */
 #iv-choice .wrap label, #iv-multi .wrap label { border-radius:var(--r-full) !important; }
-#iv-continue button { background:var(--primary) !important; color:var(--on-primary) !important;
+#iv-continue, #iv-continue button { background:var(--primary) !important; color:var(--on-primary) !important;
   box-shadow:0 2px 0 var(--primary-deep) !important; border:0 !important; font-weight:600 !important; }
-#iv-continue button:hover { background:var(--primary-deep) !important; }
-#iv-save button { background:transparent !important; color:var(--primary-deep) !important;
-  border:0 !important; box-shadow:none !important; font-weight:600 !important; }
-#iv-save button:hover { background:var(--primary-tint) !important; }
+#iv-continue:hover, #iv-continue button:hover { background:var(--primary-deep) !important; }
 """
 
 
@@ -190,29 +187,38 @@ def advance_to(session: SessionState, target: "State | str | None") -> None:
 
 
 def derive_answer(spec: ResponderSpec, radio_v, multi_v, country_v, text_v) -> str:
-    if spec.mode == "choice" and spec.multi:
-        return ", ".join(multi_v) if multi_v else ""
-    if spec.mode == "choice":
-        return radio_v or ""
-    if spec.mode == "country":
-        return country_name(country_v) if country_v else ""
+    """Read the answer, preferring a structured selection, else the text box.
+
+    The text box is always available, so it is the fallback whenever the
+    structured control (pills/country) wasn't used.
+    """
+    if spec.mode == "choice" and spec.multi and multi_v:
+        return ", ".join(multi_v)
+    if spec.mode == "choice" and radio_v:
+        return radio_v
+    if spec.mode == "country" and country_v:
+        return country_name(country_v)
     return (text_v or "").strip()
 
 
 def responder_updates(spec: ResponderSpec):
-    """gr.update() tuple for (radio, multi, country, text) given the spec."""
-    is_choice_single = spec.mode == "choice" and not spec.multi
-    is_choice_multi = spec.mode == "choice" and spec.multi
+    """gr.update() tuple for (radio, multi, country, text) given the spec.
+
+    The free-text box is ALWAYS visible so the person can always answer and
+    continue, even if the model omits or malforms its responder directive. Pills
+    or the country selector appear in addition when the model offers them.
+    """
+    is_choice_single = spec.mode == "choice" and not spec.multi and bool(spec.options)
+    is_choice_multi = spec.mode == "choice" and spec.multi and bool(spec.options)
     is_country = spec.mode == "country"
-    is_text = spec.mode == "text"
     return (
         gr.update(visible=is_choice_single, choices=spec.options if is_choice_single else [], value=None),
         gr.update(visible=is_choice_multi, choices=spec.options if is_choice_multi else [], value=[]),
         gr.update(visible=is_country, value=None),
         gr.update(
-            visible=is_text,
+            visible=True,  # safety net — always available
             value="",
-            placeholder=spec.placeholder or "Take your time. You can write in any language.",
+            placeholder=spec.placeholder or "Type your answer here…",
         ),
     )
 
@@ -256,19 +262,17 @@ def build(
 
         with gr.Column(elem_id="iv-responder"):
             gr.HTML('<div class="label-row">Your answer</div>')
-            radio = gr.Radio(choices=[], label="", visible=False, elem_id="iv-choice")
-            multi = gr.CheckboxGroup(choices=[], label="", visible=False, elem_id="iv-multi")
+            radio = gr.Radio(choices=[], label="", show_label=False, visible=False, elem_id="iv-choice")
+            multi = gr.CheckboxGroup(choices=[], label="", show_label=False, visible=False, elem_id="iv-multi")
             country = gr.Dropdown(
-                choices=country_choices(), label="", visible=False,
+                choices=country_choices(), label="", show_label=False, visible=False,
                 allow_custom_value=True, filterable=True, elem_id="iv-country",
             )
             text = gr.Textbox(
-                label="", lines=3, visible=False, elem_id="iv-text",
-                placeholder="Take your time. You can write in any language.",
+                label="", show_label=False, lines=3, visible=True, elem_id="iv-text",
+                placeholder="Type your answer here…",
             )
-            with gr.Row():
-                save = gr.Button("⤓ Save and continue later", elem_id="iv-save", scale=1)
-                cont = gr.Button("Continue →", elem_id="iv-continue", scale=1)
+            cont = gr.Button("Continue →", elem_id="iv-continue")
 
     stream_outputs = [chat, rail, radio, multi, country, text, session_st, loop_st, spec_st]
 

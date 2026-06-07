@@ -15,6 +15,7 @@ here (CLAUDE.md Design Rule 7).
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -27,6 +28,7 @@ from agent.loop import create_loop  # noqa: E402
 from app.config import load_env  # noqa: E402
 from app.design_tokens import root_css  # noqa: E402
 from app.phases import assessment as assessment_phase  # noqa: E402
+from app.phases import documents as documents_phase  # noqa: E402
 from app.phases import intake as intake_phase  # noqa: E402
 from app.phases import interview as interview_phase  # noqa: E402
 from app.phases import recommendations as reco_phase  # noqa: E402
@@ -34,6 +36,9 @@ from app.state.session import SessionState, State  # noqa: E402
 
 # Load .env (OLLAMA_HOST, MODEL_ID, …) before anything reads the environment.
 load_env()
+
+# One model for the whole flow (hackathon: single LLM, no fallback). Read from
+# MODEL_ID via the loop factory.
 
 # Web fonts: Fraunces (display serif) + Inter (UI sans) per DESIGN.md §3.
 FONT_IMPORT = (
@@ -73,7 +78,8 @@ APP_CSS = (
     + intake_phase.INTAKE_CSS + "\n"
     + interview_phase.INTERVIEW_CSS + "\n"
     + assessment_phase.ASSESSMENT_CSS + "\n"
-    + reco_phase.RECO_CSS
+    + reco_phase.RECO_CSS + "\n"
+    + documents_phase.DOCUMENTS_CSS
 )
 
 
@@ -98,6 +104,7 @@ def build_app() -> gr.Blocks:
         interview_ui = interview_phase.build(visible=False, session_st=session_st, loop_st=loop_st)
         assess_ui = assessment_phase.build(visible=False, session_st=session_st, loop_st=loop_st)
         reco_ui = reco_phase.build(visible=False, session_st=session_st)
+        docs_ui = documents_phase.build(visible=False, session_st=session_st)
 
         async def begin(lang, session, loop):
             if not lang:
@@ -121,7 +128,9 @@ def build_app() -> gr.Blocks:
             # confirmed, then hands off to the assessment screen.
             if not _confirmed_review(session):
                 return
-            async for facts_html, reason_html, progress_html, sess in assess_ui.start_fn(session, loop):
+            # Fresh loop for the assessment turn (same model, its own steering/abort).
+            assess_loop = create_loop()
+            async for facts_html, reason_html, progress_html, sess in assess_ui.start_fn(session, assess_loop):
                 yield (gr.update(visible=False), gr.update(visible=True),
                        facts_html, reason_html, progress_html, sess)
 
@@ -150,12 +159,48 @@ def build_app() -> gr.Blocks:
         # Once the assessment stream finishes, show the recommendation cards.
         assess_event.then(show_recommendations, inputs=[session_st], outputs=reco_outputs)
 
+        # Recommendations -> Documents: generate the package for the chosen country.
+        docs_outputs = [reco_ui.column, docs_ui.column, *docs_ui.render_outputs]
+
+        def show_documents(session):
+            if session is None or not session.selected_country:
+                return [gr.update()] * len(docs_outputs)
+            if session.state < State.DOCUMENTS:
+                from app.phases.interview import advance_to
+                advance_to(session, State.DOCUMENTS)
+            updates = docs_ui.populate(session)
+            return [gr.update(visible=False), gr.update(visible=True), *updates]
+
+        reco_ui.proceed.click(show_documents, inputs=[session_st], outputs=docs_outputs)
+
+        # Start over: return to the intake screen for a fresh session.
+        def start_over():
+            return (
+                gr.update(visible=True), gr.update(visible=False),
+                gr.update(visible=False), gr.update(visible=False),
+                gr.update(visible=False), None, None,
+            )
+
+        docs_ui.start_over.click(
+            start_over,
+            inputs=[],
+            outputs=[intake_ui.column, interview_ui.column, assess_ui.column,
+                     reco_ui.column, docs_ui.column, session_st, loop_st],
+        )
+
     return demo
 
 
 def main() -> None:
+    import tempfile
+
     demo = build_app()
-    demo.launch(server_name="0.0.0.0", css=APP_CSS, theme=gr.themes.Base())
+    # allowed_paths lets Gradio serve the generated PDFs (written to the system
+    # temp dir) for download.
+    demo.launch(
+        server_name="0.0.0.0", css=APP_CSS, theme=gr.themes.Base(),
+        allowed_paths=[tempfile.gettempdir()],
+    )
 
 
 if __name__ == "__main__":

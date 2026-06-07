@@ -43,10 +43,10 @@ def test_begin_without_language_raises():
 
 def test_begin_with_language_transitions_to_intake():
     s = SessionState()
-    select_language(s, "Kiswahili")
+    select_language(s, "Español")
     assert begin_interview(s) is State.INTAKE
     assert s.state is State.INTAKE
-    assert s.language == "Swahili"
+    assert s.language == "Spanish"
 
 
 def test_toggle_selection_single_and_deselect():

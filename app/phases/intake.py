@@ -17,16 +17,19 @@ import gradio as gr
 
 from app.state.session import SessionState, State
 
-# (native script label, English gloss). Order matches the mockup grid.
+# (native script label, English gloss). Limited to the languages the single
+# model (lfm2.5:8b) handles reliably — verified by a language probe.
 LANGUAGES = [
     ("English", "English"),
     ("Français", "French"),
-    ("العربية", "Arabic"),
-    ("Kiswahili", "Swahili"),
-    ("አማርኛ", "Amharic"),
-    ("Soomaali", "Somali"),
-    ("Hausa", "Hausa"),
+    ("Español", "Spanish"),
     ("Português", "Portuguese"),
+    ("العربية", "Arabic"),
+    ("हिन्दी", "Hindi"),
+    ("中文", "Chinese"),
+    ("日本語", "Japanese"),
+    ("한국어", "Korean"),
+    ("Русский", "Russian"),
 ]
 
 # Map a chosen pill label (native) to the English name stored on the session.
@@ -62,10 +65,10 @@ INTAKE_CSS = """
   color:var(--on-primary) !important; box-shadow:var(--shadow-sm) !important; }
 
 .intake-cta { margin-top:30px; }
-#intake-begin button { background:var(--accent) !important; color:var(--on-accent) !important;
+#intake-begin, #intake-begin button { background:var(--accent) !important; color:var(--on-accent) !important;
   box-shadow:0 2px 0 var(--accent-deep) !important; border:0 !important; border-radius:var(--r-md) !important;
   font-weight:600 !important; font-size:16px !important; padding:16px 28px !important; }
-#intake-begin button:hover { background:var(--accent-deep) !important; box-shadow:0 2px 0 #a8531f !important; }
+#intake-begin:hover, #intake-begin button:hover { background:var(--accent-deep) !important; box-shadow:0 2px 0 #a8531f !important; }
 
 .intake-trust { margin-top:24px; display:inline-flex; align-items:center; gap:9px; font-size:13px;
   color:var(--text-muted); background:var(--surface-2); border:1px solid var(--line);
