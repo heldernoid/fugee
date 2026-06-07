@@ -69,6 +69,11 @@ ASSESSMENT_CSS = """
 .reason-doc .ln { display:block; margin-bottom:10px; padding-left:18px; position:relative; }
 .reason-doc .ln::before { content:""; position:absolute; left:0; top:9px; width:7px; height:7px; border-radius:50%; background:var(--primary); opacity:.5; }
 .reason-doc .ln strong { color:var(--text); font-weight:600; }
+#assess-proceed-row { padding:18px clamp(18px,4vw,28px); border-top:1px solid var(--line); justify-content:flex-end; }
+#assess-proceed, #assess-proceed button { background:var(--accent) !important; color:var(--on-accent) !important;
+  box-shadow:0 2px 0 var(--accent-deep) !important; border:0 !important; font-weight:600 !important;
+  border-radius:var(--r-md) !important; padding:13px 24px !important; }
+#assess-proceed:hover, #assess-proceed button:hover { background:var(--accent-deep) !important; }
 """
 
 
@@ -255,6 +260,7 @@ class AssessmentUI:
     facts: gr.HTML
     reason: gr.HTML
     progress: gr.HTML
+    proceed: gr.Button
     start_fn: callable
     outputs: list
 
@@ -270,15 +276,23 @@ def build(visible: bool = False, session_st: gr.State | None = None, loop_st: gr
                 with gr.Column(elem_classes=["assess__reason"]):
                     progress = gr.HTML(render_progress(0, ""))
                     reason = gr.HTML('<div class="reason-doc"></div>')
+            with gr.Row(elem_id="assess-proceed-row"):
+                proceed = gr.Button("See your recommendations →", elem_id="assess-proceed", visible=False)
 
-    outputs = [facts, reason, progress, session_st]
+    # outputs order: facts, reason, progress, proceed(button), session
+    outputs = [facts, reason, progress, proceed, session_st]
 
     async def start(session, loop):
+        last = (gr.update(), gr.update(), gr.update())
         async for facts_html, reason_html, progress_html in stream_assessment(session, loop):
-            yield facts_html, reason_html, progress_html, session
+            last = (facts_html, reason_html, progress_html)
+            # keep the proceed button hidden while reasoning streams
+            yield facts_html, reason_html, progress_html, gr.update(visible=False), session
+        # done — let the person read, then choose to continue
+        yield last[0], last[1], last[2], gr.update(visible=True), session
 
     return AssessmentUI(
-        column=column, facts=facts, reason=reason, progress=progress,
+        column=column, facts=facts, reason=reason, progress=progress, proceed=proceed,
         start_fn=start, outputs=outputs,
     )
 

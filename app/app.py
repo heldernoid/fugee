@@ -170,13 +170,13 @@ def build_app() -> gr.Blocks:
                 return
             # Fresh loop for the assessment turn (same model, its own steering/abort).
             assess_loop = create_loop()
-            async for facts_html, reason_html, progress_html, sess in assess_ui.start_fn(session, assess_loop):
+            async for facts_html, reason_html, progress_html, proceed_u, sess in assess_ui.start_fn(session, assess_loop):
                 yield (gr.update(visible=False), gr.update(visible=True),
-                       facts_html, reason_html, progress_html, sess)
+                       facts_html, reason_html, progress_html, proceed_u, sess)
 
         # After each interview turn completes, check whether the review was
         # confirmed and, if so, hand off to the assessment screen.
-        assess_event = interview_ui.continue_event.then(
+        interview_ui.continue_event.then(
             maybe_assess,
             inputs=[session_st, loop_st],
             outputs=[interview_ui.column, assess_ui.column, *assess_ui.outputs],
@@ -185,7 +185,8 @@ def build_app() -> gr.Blocks:
         reco_outputs = [assess_ui.column, reco_ui.column, *reco_ui.render_outputs, session_st]
 
         def show_recommendations(session):
-            # Reveal the recommendations once the assessment has produced them.
+            # Reveal the recommendations only when the person clicks "See your
+            # recommendations" — so they can read the assessment first.
             ready = (
                 session is not None
                 and session.state >= State.RECOMMENDATIONS
@@ -196,8 +197,8 @@ def build_app() -> gr.Blocks:
             updates = reco_ui.populate(session)
             return [gr.update(visible=False), gr.update(visible=True), *updates, session]
 
-        # Once the assessment stream finishes, show the recommendation cards.
-        assess_event.then(show_recommendations, inputs=[session_st], outputs=reco_outputs)
+        # The person reads the assessment, then clicks to see recommendations.
+        assess_ui.proceed.click(show_recommendations, inputs=[session_st], outputs=reco_outputs)
 
         # Recommendations -> Documents: generate the package for the chosen country.
         docs_outputs = [reco_ui.column, docs_ui.column, *docs_ui.render_outputs]
