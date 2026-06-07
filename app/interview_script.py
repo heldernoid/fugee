@@ -25,15 +25,17 @@ class Question:
     control: str        # "country" | "yesno" | "choice" | "text"
     kind: str = "str"   # str | bool | list | list_text
     options: list = field(default_factory=list)  # option string-ids for choice/yesno
+    alt_sid: str | None = None       # alternate text when still in country of origin
+    skip_if_in_origin: bool = False  # skip when current country == origin
 
 
 # Ordered interview plan. Controls are fixed; some questions template {origin}.
 QUESTIONS: list[Question] = [
     Question("q_current", "current_country", State.SITUATION, "country"),
     Question("q_origin", "origin_country", State.SITUATION, "country"),
-    Question("q_reason", "free_text_history", State.SITUATION, "text"),
+    Question("q_reason", "free_text_history", State.SITUATION, "text", alt_sid="q_reason_instill"),
     Question("q_danger", "immediate_danger", State.SITUATION, "yesno", kind="bool"),
-    Question("q_duration", "displacement_duration", State.HISTORY, "text"),
+    Question("q_duration", "displacement_duration", State.HISTORY, "text", skip_if_in_origin=True),
     Question("q_documents", "documents_available", State.HISTORY, "choice", kind="list",
              options=["opt_passport", "opt_id", "opt_birth", "opt_none", "opt_other"]),
     Question("q_languages", "languages_spoken", State.GOALS, "text", kind="list_text"),
@@ -236,15 +238,75 @@ TR: dict[str, dict[str, str]] = {
 }
 
 
+# Extra strings (still-in-country reason wording + the correction prompt),
+# merged into TR. t() falls back to English for any language missing a key.
+_EXTRA = {
+    "English": {
+        "q_reason_instill": "Can you tell me what is happening in {origin} that makes you fear for your safety?",
+        "q_correct": "What would you like to correct? You can tell me in your own words.",
+    },
+    "French": {
+        "q_reason_instill": "Pouvez-vous me dire ce qui se passe en {origin} qui vous fait craindre pour votre sécurité ?",
+        "q_correct": "Que souhaitez-vous corriger ? Dites-le-moi avec vos propres mots.",
+    },
+    "Spanish": {
+        "q_reason_instill": "¿Puedes contarme qué está pasando en {origin} que te hace temer por tu seguridad?",
+        "q_correct": "¿Qué te gustaría corregir? Puedes decírmelo con tus propias palabras.",
+    },
+    "Portuguese": {
+        "q_reason_instill": "Pode me contar o que está acontecendo em {origin} que faz você temer pela sua segurança?",
+        "q_correct": "O que você gostaria de corrigir? Pode me dizer com suas próprias palavras.",
+    },
+    "Arabic": {
+        "q_reason_instill": "هل يمكنك أن تخبرني بما يحدث في {origin} ويجعلك تخشى على سلامتك؟",
+        "q_correct": "ما الذي تودّ تصحيحه؟ يمكنك إخباري بكلماتك الخاصة.",
+    },
+    "Hindi": {
+        "q_reason_instill": "क्या आप बता सकते हैं कि {origin} में क्या हो रहा है जिससे आपको अपनी सुरक्षा का डर है?",
+        "q_correct": "आप क्या ठीक करना चाहेंगे? आप अपने शब्दों में बता सकते हैं।",
+    },
+    "Chinese": {
+        "q_reason_instill": "能告诉我{origin}正在发生什么、让您为自己的安全感到担忧吗？",
+        "q_correct": "您想更正什么？可以用您自己的话告诉我。",
+    },
+    "Japanese": {
+        "q_reason_instill": "{origin}で何が起きていて、ご自身の安全が脅かされていると感じるのか教えていただけますか？",
+        "q_correct": "どこを修正したいですか？ ご自身の言葉で教えてください。",
+    },
+    "Korean": {
+        "q_reason_instill": "{origin}에서 무슨 일이 일어나고 있어 안전이 걱정되시는지 말씀해 주시겠어요?",
+        "q_correct": "무엇을 고치고 싶으신가요? 편하게 말씀해 주세요.",
+    },
+    "Russian": {
+        "q_reason_instill": "Расскажите, что происходит в {origin}, из-за чего вы опасаетесь за свою безопасность?",
+        "q_correct": "Что вы хотели бы исправить? Можете рассказать своими словами.",
+    },
+}
+for _lang, _d in _EXTRA.items():
+    TR.setdefault(_lang, {}).update(_d)
+
+
 def t(language: str | None, sid: str) -> str:
     """Translation lookup with English fallback."""
     lang = language if language in TR else "English"
     return TR[lang].get(sid) or TR["English"].get(sid, sid)
 
 
+def in_origin(session) -> bool:
+    """True when the person is still in their country of origin."""
+    o = (session.interview.origin_country or "").strip().lower()
+    c = (session.interview.current_country or "").strip().lower()
+    return bool(o) and o == c
+
+
 def question_text(language: str | None, q: Question, session) -> str:
-    """Localised question text, templated with collected values."""
-    raw = t(language, q.sid)
+    """Localised question text, templated with collected values.
+
+    Uses the alternate wording when the person is still in their origin country
+    (so we don't ask "what made you leave" / "how long ago did you leave").
+    """
+    sid = q.alt_sid if (q.alt_sid and in_origin(session)) else q.sid
+    raw = t(language, sid)
     origin = session.interview.origin_country or t(language, "q_origin")
     current = session.interview.current_country or ""
     return raw.replace("{origin}", str(origin)).replace("{current}", str(current))
@@ -256,4 +318,5 @@ def option_labels(language: str | None, q: Question) -> list[str]:
     return [t(language, oid) for oid in q.options]
 
 
-__all__ = ["Question", "QUESTIONS", "REVIEW_INDEX", "TR", "t", "question_text", "option_labels"]
+__all__ = ["Question", "QUESTIONS", "REVIEW_INDEX", "TR", "t", "question_text",
+           "option_labels", "in_origin"]

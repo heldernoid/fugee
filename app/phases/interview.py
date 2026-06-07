@@ -11,6 +11,7 @@ mismatched controls, drift). Answers are captured straight into
 from __future__ import annotations
 
 import html
+import re
 
 import gradio as gr
 
@@ -22,10 +23,13 @@ from app.interview_script import (
     QUESTIONS,
     REVIEW_INDEX,
     Question,
+    in_origin,
     option_labels,
     question_text,
     t,
 )
+
+CORRECT_INDEX = REVIEW_INDEX + 1  # pseudo-step: free-text correction
 from app.state.session import SessionState, State
 
 RAIL = [
@@ -98,8 +102,13 @@ def render_rail(state: State) -> str:
     return f'<div class="iv-rail" aria-label="Interview progress">{"".join(pills)}</div>'
 
 
+def _bold(escaped: str) -> str:
+    """Render **markdown bold** (used for review summary labels)."""
+    return re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", escaped)
+
+
 def _bubble(role: str, text: str, current: bool = False) -> str:
-    safe = html.escape(text).replace("\n", "<br>")
+    safe = _bold(html.escape(text)).replace("\n", "<br>")
     if role == "user":
         return ('<div class="iv-msg iv-msg--user"><div class="iv-msg__av"><span>You</span></div>'
                 f'<div class="iv-msg__bubble">{safe}</div></div>')
@@ -136,9 +145,20 @@ def advance_to(session: SessionState, target) -> None:
 # Controls (deterministic per question)
 # --------------------------------------------------------------------------
 
+def _next_index(session: SessionState, idx: int) -> int:
+    """Next applicable question index, skipping ones that don't apply."""
+    j = idx + 1
+    while j < REVIEW_INDEX and QUESTIONS[j].skip_if_in_origin and in_origin(session):
+        j += 1
+    return j
+
+
 def control_updates(session: SessionState, idx: int):
     """(radio, multi, country, text) updates for the question at ``idx``."""
     lang = session.language
+    if idx == CORRECT_INDEX:  # free-text correction
+        return (gr.update(visible=False), gr.update(visible=False), gr.update(visible=False),
+                gr.update(visible=True, value=""))
     if idx >= REVIEW_INDEX:
         choices = [t(lang, "review_yes"), t(lang, "review_no")]
         return (gr.update(visible=True, choices=choices, value=None),
@@ -208,6 +228,8 @@ def _facts_recap(session: SessionState) -> str:
 
 
 def _agent_message_for(session: SessionState, idx: int, *, welcome: bool = False) -> str:
+    if idx == CORRECT_INDEX:
+        return t(session.language, "q_correct")
     text = question_text(session.language, QUESTIONS[idx], session)
     if welcome:
         return f"{t(session.language, 'welcome')}\n{text}"
@@ -229,13 +251,27 @@ def _labeled_facts(session: SessionState) -> str:
     return "\n".join(f"{k}: {v}" for k, v in fields if v)
 
 
+def _bold_labels(text: str) -> str:
+    """Wrap the 'Label:' prefix of each line in ** so it renders bold."""
+    out = []
+    for line in text.split("\n"):
+        if ":" in line and not line.lstrip().startswith("**"):
+            label, _, rest = line.partition(":")
+            if 0 < len(label) <= 40:
+                out.append(f"**{label.strip()}:**{rest}")
+                continue
+        out.append(line)
+    return "\n".join(out)
+
+
 def _labeled_fallback(session: SessionState) -> str:
     lang = session.language
-    return f"{t(lang, 'review_intro')}\n{_labeled_facts(session)}\n\n{t(lang, 'review_confirm')}"
+    facts = _bold_labels(_labeled_facts(session))
+    return f"{t(lang, 'review_intro')}\n{facts}\n\n{t(lang, 'review_confirm')}"
 
 
 async def _draft_review(session: SessionState, loop) -> str:
-    """LLM-written labeled review summary in the person's language."""
+    """LLM-written labeled review summary in the person's language (bold labels)."""
     lang = session.language or "English"
     system_prompt = (
         load_prompt("system")
@@ -253,7 +289,48 @@ async def _draft_review(session: SessionState, loop) -> str:
                 acc += ev.delta
     except Exception:
         acc = ""
-    return acc.strip() or _labeled_fallback(session)
+    return _bold_labels(acc.strip()) if acc.strip() else _labeled_fallback(session)
+
+
+_FIELD_KEYS = {
+    "origin_country", "current_country", "free_text_history", "immediate_danger",
+    "displacement_duration", "documents_available", "languages_spoken", "destination_preferences",
+}
+
+
+async def _apply_correction(session: SessionState, loop, correction: str) -> None:
+    """Agentic correction: the LLM maps the person's free-text fix to fields."""
+    system_prompt = (
+        "You update a structured interview record from a person's free-text correction. "
+        "Output ONLY lines of the form field=value, using these field names exactly: "
+        + ", ".join(sorted(_FIELD_KEYS)) + ". "
+        "immediate_danger must be yes or no. Only output the fields that should change. "
+        "No commentary."
+    )
+    prompt = (
+        "Current record:\n" + _labeled_facts(session)
+        + f"\n\nThe person says: {correction}\n\nWhat should change?"
+    )
+    acc = ""
+    try:
+        async for ev in loop.run(prompt, session=None, system_prompt=system_prompt, thinking_level="off"):
+            if isinstance(ev, TextDeltaEvent):
+                acc += ev.delta
+    except Exception:
+        acc = ""
+    for line in acc.splitlines():
+        if "=" not in line:
+            continue
+        key, _, val = line.partition("=")
+        key, val = key.strip(), val.strip()
+        if key not in _FIELD_KEYS or not val:
+            continue
+        if key == "immediate_danger":
+            setattr(session.interview, key, val.lower().startswith("y"))
+        elif key in ("documents_available", "languages_spoken", "destination_preferences"):
+            setattr(session.interview, key, [p.strip() for p in val.replace(";", ",").split(",") if p.strip()])
+        else:
+            setattr(session.interview, key, val)
 
 
 # --------------------------------------------------------------------------
@@ -292,11 +369,13 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
     stream_outputs = [chat, rail, radio, multi, country, text, session_st, loop_st, slot_idx_st]
 
     async def _present(session, loop, idx):
-        """Append the agent's message (scripted question, or LLM review summary)
-        and show the right control for the step."""
+        """Append the agent's message (scripted question, LLM review, or the
+        correction prompt) and show the right control for the step."""
         target = State.REVIEW if idx >= REVIEW_INDEX else QUESTIONS[idx].phase
         advance_to(session, target)
-        if idx >= REVIEW_INDEX:
+        if idx == CORRECT_INDEX:
+            msg = _agent_message_for(session, idx)
+        elif idx >= REVIEW_INDEX:
             msg = await _draft_review(session, loop)
         else:
             msg = _agent_message_for(session, idx, welcome=(idx == 0))
@@ -320,6 +399,17 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
         loop = loop or create_loop()
         lang = session.language
 
+        # Correction step: the person typed what to change; the agent applies it.
+        if idx == CORRECT_INDEX:
+            correction = (text_v or "").strip()
+            if not correction:
+                return (gr.update(), gr.update(), *control_updates(session, idx), session, loop, idx)
+            session.messages = list(session.messages) + [{"role": "user", "content": correction}]
+            await _apply_correction(session, loop, correction)
+            o = await _present(session, loop, REVIEW_INDEX)  # show the corrected summary
+            return (o[0], o[1], o[2], o[3], o[4], o[5], o[6], loop, o[7])
+
+        # Review step
         if idx >= REVIEW_INDEX:
             if not radio_v:
                 return (gr.update(), gr.update(), *control_updates(session, idx), session, loop, idx)
@@ -329,7 +419,7 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
                 return (render_chat(session.messages), render_rail(session.state),
                         gr.update(visible=False), gr.update(visible=False),
                         gr.update(visible=False), gr.update(visible=False), session, loop, idx)
-            o = await _present(session, loop, 0)  # "something needs changing" → restart
+            o = await _present(session, loop, CORRECT_INDEX)  # ask what to change (free text)
             return (o[0], o[1], o[2], o[3], o[4], o[5], o[6], loop, o[7])
 
         q = QUESTIONS[idx]
@@ -337,7 +427,7 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
         if display is None:
             return (gr.update(), gr.update(), *control_updates(session, idx), session, loop, idx)
         session.messages = list(session.messages) + [{"role": "user", "content": display}]
-        o = await _present(session, loop, idx + 1)
+        o = await _present(session, loop, _next_index(session, idx))
         return (o[0], o[1], o[2], o[3], o[4], o[5], o[6], loop, o[7])
 
     continue_event = cont.click(

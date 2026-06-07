@@ -192,7 +192,7 @@ async def stream_assessment(session: SessionState, loop):
 
     async for ev in loop.run(
         prompt, session, system_prompt=system_prompt,
-        tools=ASSESSMENT_TOOLS, thinking_level="medium", hooks=hooks,
+        tools=ASSESSMENT_TOOLS, thinking_level="off", hooks=hooks,
     ):
         if isinstance(ev, TextDeltaEvent):
             acc += ev.delta
