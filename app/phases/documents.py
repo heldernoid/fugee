@@ -82,11 +82,6 @@ def build(visible: bool = False, session_st: gr.State | None = None) -> Document
     session_st = session_st or gr.State(None)
 
     with gr.Column(visible=visible) as column:
-        gr.HTML(
-            '<div class="phase-head"><span class="ptag">Phase 5 — Document Package</span>'
-            '<span class="pdesc">Everything gathered into a package you can download, print, '
-            "and carry — pre-filled and ready.</span></div>"
-        )
         with gr.Column(elem_id="docs-screen"):
             with gr.Row(elem_classes=["pkg"]):
                 with gr.Column(elem_classes=["pkg__preview"]):

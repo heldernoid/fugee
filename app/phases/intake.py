@@ -166,11 +166,6 @@ def build(visible: bool = True) -> IntakeUI:
     selected_lang = gr.State(None)
 
     with gr.Column(visible=visible) as column:
-        gr.HTML(
-            '<div class="phase-head"><span class="ptag">Phase 1 — Intake</span>'
-            '<span class="pdesc">A calm welcome. You choose a language you trust before '
-            "anything else is asked.</span></div>"
-        )
         with gr.Column(elem_id="intake-screen"):
             gr.HTML(_HEADER_HTML)
             with gr.Row(elem_id="intake-langs"):

@@ -228,11 +228,6 @@ def build(visible: bool = False, session_st: gr.State | None = None) -> Recommen
     slots, cards, btns = [], [], []
 
     with gr.Column(visible=visible) as column:
-        gr.HTML(
-            '<div class="phase-head"><span class="ptag">Phase 4 — Recommendations &amp; Action Plan</span>'
-            '<span class="pdesc">Clear options, ranked and explained — followed by a concrete, '
-            "step-by-step roadmap for the country you choose.</span></div>"
-        )
         with gr.Column(elem_id="reco-screen"):
             gr.HTML(
                 '<p class="reco__intro">Based on your situation, these are the safest and '

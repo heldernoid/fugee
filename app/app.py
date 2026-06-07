@@ -123,14 +123,13 @@ def phase_header(tag: str, desc: str) -> str:
     return f'<div class="phase-head"><span class="ptag">{tag}</span><span class="pdesc">{desc}</span></div>'
 
 
-def _confirmed_review(session) -> bool:
-    """True when the person has just confirmed the review summary."""
-    if session is None or session.state != State.REVIEW:
-        return False
-    users = [m for m in session.messages if m.get("role") == "user"]
-    if not users:
-        return False
-    return users[-1].get("content", "").strip().lower().startswith("yes")
+def _ready_for_assessment(session) -> bool:
+    """The interview advances state to ASSESSMENT once the review is confirmed."""
+    return (
+        session is not None
+        and session.state == State.ASSESSMENT
+        and not session.assessment.recommended_countries
+    )
 
 
 def build_app() -> gr.Blocks:
@@ -166,8 +165,8 @@ def build_app() -> gr.Blocks:
 
         async def maybe_assess(session, loop):
             # Triggered after each interview turn; runs only once the review is
-            # confirmed, then hands off to the assessment screen.
-            if not _confirmed_review(session):
+            # confirmed (interview set state -> ASSESSMENT), then streams the assessment.
+            if not _ready_for_assessment(session):
                 return
             # Fresh loop for the assessment turn (same model, its own steering/abort).
             assess_loop = create_loop()
