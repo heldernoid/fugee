@@ -63,6 +63,10 @@ class AgentLoop:
         self.provider = os.getenv("MODEL_PROVIDER", "ollama")
         self._host = host or os.getenv("OLLAMA_HOST")
         self._client = None  # lazily created so import never needs a server
+        # Not all models accept the `think` parameter (e.g. qwen2.5:7b). We
+        # optimistically try it, then disable it for this session on first
+        # rejection so later turns don't keep 400-ing.
+        self._supports_thinking = True
         self.steering_queue: "asyncio.Queue[str]" = asyncio.Queue()
         self.abort_event = asyncio.Event()
 
@@ -93,6 +97,38 @@ class AgentLoop:
 
     def _tool_map(self, tools: list[AgentTool]) -> dict[str, AgentTool]:
         return {t.name: t for t in tools}
+
+    async def _iter_chat(self, client, messages, tool_schemas, think_arg):
+        """Stream chat chunks, gracefully degrading if the model rejects the
+        `think` parameter (non-thinking models like qwen2.5:7b).
+
+        The rejection is a 400 raised when the stream begins iterating, before
+        any chunk is produced, so it is safe to retry once without `think`. If
+        chunks have already been yielded, any error propagates unchanged.
+        """
+        want_think = think_arg if self._supports_thinking else None
+        attempts = [want_think] + ([None] if want_think is not None else [])
+
+        for attempt_think in attempts:
+            produced = False
+            try:
+                stream = await client.chat(
+                    model=self.model_id,
+                    messages=messages,
+                    tools=tool_schemas,
+                    stream=True,
+                    think=attempt_think,
+                )
+                async for chunk in stream:
+                    produced = True
+                    yield chunk
+                return
+            except Exception as exc:  # noqa: BLE001
+                unsupported = attempt_think is not None and "thinking" in str(exc).lower()
+                if unsupported and not produced:
+                    self._supports_thinking = False
+                    continue  # retry this turn without `think`
+                raise
 
     async def _execute_tool(self, name: str, args: dict, tool_map: dict) -> dict:
         tool = tool_map.get(name)
@@ -138,15 +174,9 @@ class AgentLoop:
                 assistant_text = ""
                 tool_calls: list = []
 
-                stream = await client.chat(
-                    model=self.model_id,
-                    messages=messages,
-                    tools=tool_schemas,
-                    stream=True,
-                    think=thinking_level if thinking_level in ("low", "medium", "high") else None,
-                )
+                think_arg = thinking_level if thinking_level in ("low", "medium", "high") else None
 
-                async for chunk in stream:
+                async for chunk in self._iter_chat(client, messages, tool_schemas, think_arg):
                     if self.abort_event.is_set():
                         break
                     msg = getattr(chunk, "message", None)
