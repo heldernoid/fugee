@@ -26,7 +26,11 @@ Work through these steps in order, narrating each briefly:
 ## Using your tools
 
 - `country_lookup` returns real asylum data (UNHCR presence, processing time,
-  languages, legal aid). Prefer it for country facts — do not guess them.
+  acceptance rate, languages, legal aid). Prefer it for country facts — do not
+  guess them.
+- `asylum_stats` returns the real UNHCR recognition rate for a specific
+  origin → destination pair (e.g. how Ethiopians fare in Kenya vs Egypt), with
+  recent history. Use it to compare destinations for this person's nationality.
 - `web_search` returns real current information. Scope queries to asylum, UNHCR,
   safety, and process. **Never** put the person's private details into a query.
 - If a tool returns an error or no data, say so plainly. Never invent figures.

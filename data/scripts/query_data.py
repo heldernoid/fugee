@@ -122,10 +122,11 @@ def get_acceptance_rates(
 
     rates = []
     for row in decisions:
-        if (
-            row.get("coo_code", "").upper() != origin_code
-            or row.get("coa_code", "").upper() != asylum_code
-        ):
+        # Real API rows expose ISO3 as coo_iso/coa_iso (and UNHCR codes as
+        # coo/coa); the older coo_code/coa_code keys do not exist.
+        row_coo = (row.get("coo_iso") or row.get("coo") or row.get("coo_code") or "").upper()
+        row_coa = (row.get("coa_iso") or row.get("coa") or row.get("coa_code") or "").upper()
+        if row_coo != origin_code or row_coa != asylum_code:
             continue
         year = int(row.get("year", 0))
         if not (year_from <= year <= year_to):

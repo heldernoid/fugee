@@ -29,6 +29,7 @@ from app.design_tokens import root_css  # noqa: E402
 from app.phases import assessment as assessment_phase  # noqa: E402
 from app.phases import intake as intake_phase  # noqa: E402
 from app.phases import interview as interview_phase  # noqa: E402
+from app.phases import recommendations as reco_phase  # noqa: E402
 from app.state.session import SessionState, State  # noqa: E402
 
 # Load .env (OLLAMA_HOST, MODEL_ID, …) before anything reads the environment.
@@ -71,7 +72,8 @@ APP_CSS = (
     + GLOBAL_CSS + "\n"
     + intake_phase.INTAKE_CSS + "\n"
     + interview_phase.INTERVIEW_CSS + "\n"
-    + assessment_phase.ASSESSMENT_CSS
+    + assessment_phase.ASSESSMENT_CSS + "\n"
+    + reco_phase.RECO_CSS
 )
 
 
@@ -95,6 +97,7 @@ def build_app() -> gr.Blocks:
         intake_ui = intake_phase.build(visible=True)
         interview_ui = interview_phase.build(visible=False, session_st=session_st, loop_st=loop_st)
         assess_ui = assessment_phase.build(visible=False, session_st=session_st, loop_st=loop_st)
+        reco_ui = reco_phase.build(visible=False, session_st=session_st)
 
         async def begin(lang, session, loop):
             if not lang:
@@ -124,11 +127,28 @@ def build_app() -> gr.Blocks:
 
         # After each interview turn completes, check whether the review was
         # confirmed and, if so, hand off to the assessment screen.
-        interview_ui.continue_event.then(
+        assess_event = interview_ui.continue_event.then(
             maybe_assess,
             inputs=[session_st, loop_st],
             outputs=[interview_ui.column, assess_ui.column, *assess_ui.outputs],
         )
+
+        reco_outputs = [assess_ui.column, reco_ui.column, *reco_ui.render_outputs, session_st]
+
+        def show_recommendations(session):
+            # Reveal the recommendations once the assessment has produced them.
+            ready = (
+                session is not None
+                and session.state >= State.RECOMMENDATIONS
+                and session.assessment.recommended_countries
+            )
+            if not ready:
+                return [gr.update()] * len(reco_outputs)
+            updates = reco_ui.populate(session)
+            return [gr.update(visible=False), gr.update(visible=True), *updates, session]
+
+        # Once the assessment stream finishes, show the recommendation cards.
+        assess_event.then(show_recommendations, inputs=[session_st], outputs=reco_outputs)
 
     return demo
 

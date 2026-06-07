@@ -16,6 +16,7 @@ from dataclasses import dataclass
 import gradio as gr
 
 from agent.events import ErrorEvent, TextDeltaEvent, ToolEndEvent, ToolStartEvent
+from agent.tools.asylum_stats import asylum_stats_tool
 from agent.tools.country_lookup import country_lookup_tool, lookup_country
 from agent.tools.web_search import web_search_tool
 from app.assessment_parse import parse_assessment
@@ -23,7 +24,7 @@ from app.phases.interview import advance_to
 from app.prompt_loader import compose
 from app.state.session import SessionState, State
 
-ASSESSMENT_TOOLS = [web_search_tool, country_lookup_tool]
+ASSESSMENT_TOOLS = [web_search_tool, country_lookup_tool, asylum_stats_tool]
 
 # Facts shown in the left panel: (label, attribute, kind). Eight interview
 # fields (SC-030).
@@ -143,6 +144,8 @@ def _tool_status(name: str, args: dict) -> str:
         return f"Searching: {args.get('query', '')}"
     if name == "country_lookup":
         return f"Looking up: {args.get('country', '')}"
+    if name == "asylum_stats":
+        return f"Checking acceptance rates: {args.get('origin', '')} → {args.get('asylum', '')}"
     return f"Running: {name}"
 
 
@@ -165,6 +168,7 @@ async def stream_assessment(session: SessionState, loop):
     acc = ""
     pct = 5
     status = ""
+    looked_up: list[str] = []  # countries the agent actually researched
     yield facts_html, render_reason(acc), render_progress(pct, "")
 
     async for ev in loop.run(
@@ -176,6 +180,10 @@ async def stream_assessment(session: SessionState, loop):
             yield facts_html, render_reason(acc), render_progress(pct, status)
         elif isinstance(ev, ToolStartEvent):
             status = _tool_status(ev.name, ev.args)
+            if ev.name == "country_lookup":
+                c = (ev.args or {}).get("country")
+                if c:
+                    looked_up.append(c)
             pct = min(90, pct + 12)
             yield facts_html, render_reason(acc), render_progress(pct, status)
         elif isinstance(ev, ToolEndEvent):
@@ -187,17 +195,25 @@ async def stream_assessment(session: SessionState, loop):
 
     visible, result = parse_assessment(acc)
     origin = (session.interview.origin_country or "").strip().lower()
+
+    def _collect(names: list[str], into: list[dict], seen: set[str]) -> None:
+        for name in names:
+            rec = lookup_country(name)
+            if rec.get("error"):
+                continue
+            cname = (rec.get("country") or "").strip()
+            if not cname or cname.lower() == origin or cname.lower() in seen:
+                continue
+            seen.add(cname.lower())
+            into.append(rec)
+
     recs: list[dict] = []
     seen: set[str] = set()
-    for name in result.countries:
-        rec = lookup_country(name)
-        if rec.get("error"):
-            continue
-        cname = (rec.get("country") or "").strip()
-        if cname.lower() == origin or cname.lower() in seen:
-            continue
-        seen.add(cname.lower())
-        recs.append(rec)
+    _collect(result.countries, recs, seen)
+    # Fallback: if the structured block yielded no resolvable countries, use the
+    # ones the agent actually looked up during reasoning (real, not fabricated).
+    if not recs:
+        _collect(looked_up, recs, seen)
 
     session.assessment.convention_grounds = result.grounds
     session.assessment.risk_level = result.risk

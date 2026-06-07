@@ -28,10 +28,6 @@ ENRICHED = DATA_DIR / "countries_enriched.json"
 FALLBACK = DATA_DIR / "countries.json"
 
 
-def _data_file() -> Path:
-    return ENRICHED if ENRICHED.exists() else FALLBACK
-
-
 def _clean(value):
     """Treat the data layer's "PENDING" sentinel as missing (not fabricated)."""
     if isinstance(value, str) and value.strip().upper() == "PENDING":
@@ -39,10 +35,39 @@ def _clean(value):
     return value
 
 
+def _load_curated_with_stats() -> dict:
+    """Authoritative data = the curated specs/data/countries.json.
+
+    All structural content — organisations, signatory/convention status, asylum
+    systems, profiles — ALWAYS comes from the manually curated file. If the
+    enriched file exists, it overlays ONLY the numeric ``stats.*`` values that
+    the curator left as "PENDING"; it can never replace curated fields.
+    """
+    curated = json.loads(FALLBACK.read_text(encoding="utf-8"))
+    if not ENRICHED.exists():
+        return curated
+    try:
+        enriched = json.loads(ENRICHED.read_text(encoding="utf-8"))
+    except (ValueError, OSError):
+        return curated
+    for group in ("signatories", "non_signatories"):
+        for iso3, entry in curated.get(group, {}).items():
+            en = enriched.get(group, {}).get(iso3)
+            if not en or not isinstance(en.get("stats"), dict):
+                continue
+            stats = dict(entry.get("stats", {}) or {})
+            for key, value in en["stats"].items():
+                # Only fill from enrichment when it has a real (non-PENDING) value.
+                if not (isinstance(value, str) and value.strip().upper() == "PENDING"):
+                    stats[key] = value
+            entry["stats"] = stats
+    return curated
+
+
 @lru_cache(maxsize=1)
 def _index() -> dict[str, dict]:
     """Build a name/iso3 -> entry index once, across both country groups."""
-    data = json.loads(_data_file().read_text(encoding="utf-8"))
+    data = _load_curated_with_stats()
     index: dict[str, dict] = {}
     for group in ("signatories", "non_signatories"):
         for iso3, entry in data.get(group, {}).items():
@@ -58,6 +83,12 @@ def _lookup(country: str) -> dict | None:
         return None
     idx = _index()
     return idx.get(country.strip().upper()) or idx.get(country.strip().lower())
+
+
+def resolve_iso3(country: str) -> str | None:
+    """Map a country name or code to its ISO3 (from the curated data)."""
+    entry = _lookup(country)
+    return entry.get("iso3") if entry else None
 
 
 def _record_for_signatory(entry: dict) -> dict:
@@ -148,4 +179,4 @@ country_lookup_tool = AgentTool(
 )
 
 
-__all__ = ["country_lookup_tool", "lookup_country"]
+__all__ = ["country_lookup_tool", "lookup_country", "resolve_iso3"]

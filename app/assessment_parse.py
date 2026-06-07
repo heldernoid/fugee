@@ -29,16 +29,29 @@ def _split_list(value: str) -> list[str]:
 
 
 def parse_assessment(text: str) -> tuple[str, AssessmentResult]:
-    """Return (visible_reasoning, AssessmentResult)."""
+    """Return (visible_reasoning, AssessmentResult).
+
+    Robust to small-model drift: parses the LAST ``@@ASSESSMENT`` block (models
+    sometimes echo it), and the visible reasoning is the text with every block
+    span removed (so reasoning written before *and* after the block is kept).
+    """
     if not text:
         return "", AssessmentResult()
 
-    match = _BLOCK_RE.search(text)
-    if not match:
+    matches = list(_BLOCK_RE.finditer(text))
+    if not matches:
         return text.strip(), AssessmentResult()
 
-    visible = text[: match.start()].rstrip()
-    body = match.group(1)
+    # Visible reasoning = text minus all block spans.
+    visible_parts = []
+    cursor = 0
+    for m in matches:
+        visible_parts.append(text[cursor:m.start()])
+        cursor = m.end()
+    visible_parts.append(text[cursor:])
+    visible = "".join(visible_parts).strip()
+
+    body = matches[-1].group(1)  # parse the last block
 
     result = AssessmentResult()
     for line in body.splitlines():

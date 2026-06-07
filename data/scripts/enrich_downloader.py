@@ -78,7 +78,12 @@ def fetch_unhcr_code_map(client: httpx.Client) -> dict[str, str]:
         data = r.json()
         items = data.get("items") or data.get("data") or []
         for item in items:
-            iso3 = item.get("iso3") or item.get("coo_iso") or item.get("coa_iso")
+            # The /countries/ endpoint exposes ISO3 as "iso" (and "code");
+            # older API shapes used iso3/coo_iso/coa_iso.
+            iso3 = (
+                item.get("iso3") or item.get("iso")
+                or item.get("coo_iso") or item.get("coa_iso")
+            )
             code = item.get("code") or item.get("coo") or item.get("coa")
             if iso3 and code:
                 mapping[iso3.upper()] = code.upper()
@@ -174,7 +179,8 @@ def compute_stats(
             try: return int(v) if v not in (None, "", "-") else 0
             except: return 0
         y["recognized"]        += _int(row.get("dec_recognized") or row.get("decisions_recognized"))
-        y["complementary"]     += _int(row.get("dec_complementary") or row.get("decisions_complementary"))
+        # Complementary protection is exposed as "dec_other" in the API.
+        y["complementary"]     += _int(row.get("dec_other") or row.get("dec_complementary") or row.get("decisions_complementary"))
         y["otherwise_closed"]  += _int(row.get("dec_closed") or row.get("decisions_closed"))
         y["rejected"]          += _int(row.get("dec_rejected") or row.get("decisions_rejected"))
         y["total"]             += _int(row.get("dec_total") or row.get("decisions_total"))
