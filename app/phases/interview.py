@@ -532,14 +532,19 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
             return _clear_controls()
         return control_updates(session, idx)
 
+    # show_progress="hidden": the choice controls are always mounted-visible, so
+    # Gradio's generic per-component "processing…" overlay would paint a spinner on
+    # each of them (it showed twice). The conversation itself signals progress.
     continue_event = cont.click(
         on_continue,
         inputs=[radio, multi_grounds, multi_docs, country, text, session_st, loop_st, slot_idx_st],
         outputs=stream_outputs,
+        show_progress="hidden",
     ).then(
         reveal_controls,
         inputs=[session_st, slot_idx_st],
         outputs=control_comps,
+        show_progress="hidden",
     )
 
     return InterviewUI(

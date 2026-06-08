@@ -175,10 +175,12 @@ def build_app() -> gr.Blocks:
             begin,
             inputs=[intake_ui.selected_lang, interview_ui.session, interview_ui.loop],
             outputs=[intake_ui.column, interview_ui.column, *interview_ui.stream_outputs],
+            show_progress="hidden",
         ).then(
             interview_ui.reveal_fn,
             inputs=interview_ui.reveal_inputs,
             outputs=interview_ui.reveal_outputs,
+            show_progress="hidden",
         )
 
         async def maybe_assess(session, loop):

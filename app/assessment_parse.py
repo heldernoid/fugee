@@ -13,6 +13,15 @@ import re
 from dataclasses import dataclass, field
 
 _BLOCK_RE = re.compile(r"@@ASSESSMENT\b(.*?)(?:@@END|\Z)", re.IGNORECASE | re.DOTALL)
+# Small models sometimes emit the metadata as a prose "Summary of my assessment"
+# list instead of the @@ASSESSMENT block (and trail a stray @@END). Strip that too.
+_SUMMARY_RE = re.compile(
+    r"(?ims)^[ \t>#*_~-]*\**\s*summary of (?:my |the |your )?assessment\b.*?(?:@@END\b|\Z)"
+)
+# A run of bare metadata field lines (case_type:/grounds:/risk:/countries:).
+_FIELD_LINE = re.compile(r"(?im)^[ \t>#*_~\-••]*\**\s*(case_type|grounds|risk|countries)\b\s*:")
+# Any stray block marker left behind.
+_STRAY_MARKER = re.compile(r"(?im)^[ \t>*_]*@@(?:ASSESSMENT|END)\b.*$")
 _VALID_RISK = {"high", "moderate", "low"}
 
 
@@ -25,53 +34,76 @@ class AssessmentResult:
 
 
 def _split_list(value: str) -> list[str]:
+    # Drop any trailing parenthetical gloss, then split on | or ,.
+    value = re.sub(r"\([^)]*\)", "", value)
     parts = re.split(r"[|,]", value)
-    return [p.strip() for p in parts if p.strip()]
+    return [p.strip(" .*_") for p in parts if p.strip(" .*_")]
+
+
+def _parse_fields(body: str) -> AssessmentResult:
+    result = AssessmentResult()
+    for raw in body.splitlines():
+        line = raw.strip().lstrip("-*••>#_ ").strip()
+        if ":" not in line:
+            continue
+        key, _, value = line.partition(":")
+        key = key.strip().lower().strip("*_ ")
+        value = value.strip()
+        if key == "grounds":
+            g = _split_list(value)
+            # "none" / "n/a" means no grounds, not a literal ground.
+            result.grounds = [] if g and g[0].lower() in {"none", "n/a", "na", "-"} else g
+        elif key == "risk":
+            m = re.match(r"[a-z]+", value.strip().lower())  # "low (…)" -> "low"
+            result.risk = m.group(0) if m and m.group(0) in _VALID_RISK else None
+        elif key == "countries":
+            result.countries = _split_list(value)
+        elif key == "case_type":
+            ct = value.lower().strip("*_ .").replace(" ", "_")
+            result.case_type = ct or None
+    return result
 
 
 def parse_assessment(text: str) -> tuple[str, AssessmentResult]:
     """Return (visible_reasoning, AssessmentResult).
 
-    Robust to small-model drift: parses the LAST ``@@ASSESSMENT`` block (models
-    sometimes echo it), and the visible reasoning is the text with every block
-    span removed (so reasoning written before *and* after the block is kept).
+    Robust to small-model drift. The structured metadata is recognised in three
+    forms — the canonical ``@@ASSESSMENT … @@END`` block, a prose "Summary of my
+    assessment" section, or a bare run of ``field: value`` lines — and is always
+    removed from the visible reasoning (along with any stray ``@@ASSESSMENT`` /
+    ``@@END`` markers) so it never leaks onto the screen.
     """
     if not text:
         return "", AssessmentResult()
 
-    matches = list(_BLOCK_RE.finditer(text))
-    if not matches:
-        return text.strip(), AssessmentResult()
+    spans: list[tuple[int, int]] = []
+    body = ""
 
-    # Visible reasoning = text minus all block spans.
-    visible_parts = []
-    cursor = 0
-    for m in matches:
-        visible_parts.append(text[cursor:m.start()])
-        cursor = m.end()
-    visible_parts.append(text[cursor:])
-    visible = "".join(visible_parts).strip()
+    block_matches = list(_BLOCK_RE.finditer(text))
+    if block_matches:
+        spans = [(m.start(), m.end()) for m in block_matches]
+        body = block_matches[-1].group(1)
+    else:
+        sm = _SUMMARY_RE.search(text)
+        if sm:
+            spans = [(sm.start(), sm.end())]
+            body = sm.group(0)
+        else:
+            fields = list(_FIELD_LINE.finditer(text))
+            if fields:
+                start = fields[0].start()
+                end_m = re.search(r"@@END\b", text[start:], re.IGNORECASE)
+                end = start + end_m.end() if end_m else len(text)
+                spans = [(start, end)]
+                body = text[start:end]
 
-    body = matches[-1].group(1)  # parse the last block
+    # Visible reasoning = text minus every metadata span, minus stray markers.
+    visible = text
+    for s, e in sorted(spans, key=lambda x: -x[0]):
+        visible = visible[:s] + visible[e:]
+    visible = _STRAY_MARKER.sub("", visible).strip()
 
-    result = AssessmentResult()
-    for line in body.splitlines():
-        if ":" not in line:
-            continue
-        key, _, value = line.partition(":")
-        key = key.strip().lower()
-        value = value.strip()
-        if key == "grounds":
-            result.grounds = _split_list(value)
-        elif key == "risk":
-            risk = value.lower()
-            result.risk = risk if risk in _VALID_RISK else None
-        elif key == "countries":
-            result.countries = _split_list(value)
-        elif key == "case_type":
-            result.case_type = value.lower().replace(" ", "_") or None
-
-    return visible, result
+    return visible, _parse_fields(body)
 
 
 __all__ = ["AssessmentResult", "parse_assessment"]
