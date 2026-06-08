@@ -116,7 +116,9 @@ def _new_docx(title: str, subtitle: str) -> Document:
 
 
 def _pdf_from_html(body_html: str, path: Path):
-    HTML(string=f"<!DOCTYPE html><html><head>{_HEAD}</head><body>{_BRAND}{body_html}</body></html>").write_pdf(str(path))
+    # base_url = the templates dir so @font-face url('fonts/...') resolves locally.
+    html_doc = f"<!DOCTYPE html><html><head>{_HEAD}</head><body>{_BRAND}{body_html}</body></html>"
+    HTML(string=html_doc, base_url=str(TEMPLATES)).write_pdf(str(path))
 
 
 # -- per-document content ---------------------------------------------------
