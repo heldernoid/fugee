@@ -124,7 +124,19 @@ def _work_visa_label(rec: dict) -> str:
     if wv.get("exists"):
         req = wv.get("requirement")
         return f"Yes — {req}" if req else "Yes"
-    return "Limited"
+    # No curated work-visa data (e.g. a European destination) — point to the
+    # regular skilled-migration route rather than implying a Gulf-style scheme.
+    return "Regular / skilled-worker visa"
+
+
+def _work_caveat(rec: dict) -> str:
+    """The curated honest caveat (Gulf) or a generic one for other destinations."""
+    sg = rec.get("strategicGuidance")
+    if sg:
+        return str(sg)
+    return ("Check the destination's official immigration website for the current "
+            "skilled-worker and labour routes, and the eligibility criteria. Use only "
+            "official channels and licensed recruiters — never unofficial 'agents'.")
 
 
 def card_body_html(rec: dict, economic: bool = False) -> str:
@@ -133,18 +145,17 @@ def card_body_html(rec: dict, economic: bool = False) -> str:
     if economic:
         # Work-migration framing — NOT an asylum claim. No recognition rate / RSD.
         badge_cls, badge_txt = "badge--work", "Work route"
-        facts = [
-            ("Work visa", _work_visa_label(rec)),
-            ("Job market", str(rec.get("economicOpportunity") or "—")),
-            ("Primary language", _language_label(rec)),
-            ("Region", str(rec.get("region") or "—")),
-        ]
+        facts = [("Work visa", _work_visa_label(rec))]
+        if rec.get("economicOpportunity"):
+            facts.append(("Job market", str(rec["economicOpportunity"])))
+        facts.append(("Primary language", _language_label(rec)))
+        if rec.get("region"):
+            facts.append(("Region", str(rec["region"])))
         facts_html = "".join(
             f'<div class="f"><span>{html.escape(k)}</span><b>{html.escape(v)}</b></div>'
             for k, v in facts
         )
-        caveat = rec.get("strategicGuidance")
-        caveat_html = f'<div class="ccard__caveat">{html.escape(str(caveat))}</div>' if caveat else ""
+        caveat_html = f'<div class="ccard__caveat">{html.escape(_work_caveat(rec))}</div>'
         prep = [
             "A confirmed job offer from a licensed employer who will sponsor your visa",
             "A valid passport — keep it in your own hands at all times",
@@ -213,13 +224,16 @@ def _work_roadmap_steps(rec: dict) -> list[tuple]:
          "before signing. Keep your own passport — do not hand it over.",
          "Embassy / visa centre", "Before travel"),
         ("Arrival and residence permit",
-         "On arrival your employer arranges your residence permit (e.g. Iqama/ID). "
+         "On arrival, complete your residence permit and registration. "
          "Confirm your job, pay and housing match your signed contract.",
          "On arrival", "First weeks"),
         ("Know your rights",
-         "Sponsorship (kafala) often ties your visa to your employer. Keep copies "
-         "of your documents and contact your embassy or a labour helpline if you "
-         "are mistreated or unpaid.",
+         ("Sponsorship (kafala) ties your visa to your employer here — keep copies "
+          "of your documents and contact your embassy or a labour helpline if you "
+          "are mistreated or unpaid.") if rec.get("kafala") else
+         ("Keep copies of your contract and documents, and know your labour rights. "
+          "Contact your embassy or a workers' rights organisation if you are "
+          "mistreated or unpaid."),
          "Your embassy · labour helpline", "Ongoing"),
     ]
 

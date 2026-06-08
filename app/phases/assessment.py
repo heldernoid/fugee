@@ -396,11 +396,17 @@ async def stream_assessment(session: SessionState, loop):
     recs: list[dict] = []
     seen: set[str] = set()
     if case_type == "economic_or_other":
-        # Not a protection case: asylum destinations would be misleading. Use the
-        # curated labour-migration shortlist (work-visa countries) deterministically
-        # — never the small model's possibly-Western asylum picks.
-        for rec in work_route_countries():
-            _add(rec)
+        # Economic (non-protection) case: these are WORK destinations, not asylum,
+        # so the model's profile-aware picks are appropriate and should match its
+        # narrated reasoning (a skilled EU resident → Germany/Norway/Canada; a
+        # low-skilled worker → Gulf/regional). Any country, signatory or not.
+        for name in list(result.countries) + (looked_up if not result.countries else []):
+            rec = lookup_country(name)
+            if not rec.get("error"):
+                _add(rec)
+        if not recs:  # last resort: the curated labour-migration shortlist
+            for rec in work_route_countries():
+                _add(rec)
     else:
         _collect(result.countries, recs, seen)
         # Fallback: the countries the agent actually looked up during reasoning…

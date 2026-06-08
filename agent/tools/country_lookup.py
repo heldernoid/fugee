@@ -101,6 +101,7 @@ def _record_for_signatory(entry: dict) -> dict:
         "country": entry.get("name"),
         "flag": entry.get("flag"),
         "tier": entry.get("tier"),
+        "region": entry.get("region"),
         "isSignatory": True,
         "unhcrPresence": bool(asylum.get("unhcr_present")),
         "unhcrOffice": asylum.get("unhcr_office"),
