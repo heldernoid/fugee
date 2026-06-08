@@ -10,6 +10,7 @@ mismatched controls, drift). Answers are captured straight into
 
 from __future__ import annotations
 
+import asyncio
 import html
 import re
 
@@ -429,22 +430,24 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
     _HIDE5 = (gr.update(visible=False), gr.update(visible=False), gr.update(visible=False),
               gr.update(visible=False), gr.update(visible=False))
 
-    def _frames(o, loop):
+    async def _emit(o, loop):
         """Two render passes (see control_frames): pass 1 sets choices while the
-        control is hidden, pass 2 reveals it — so choice controls render at once."""
+        control is hidden, pass 2 reveals it. A real beat between the two yields
+        forces the client to paint them as separate cycles — otherwise Gradio can
+        coalesce the choices-update and the reveal into one frame, which makes a
+        revealed CheckboxGroup render empty until the next click."""
         session, idx = o[7], o[8]
         hidden, reveal = control_frames(session, idx)
-        return [
-            (o[0], o[1], *hidden, session, loop, idx),
-            (o[0], o[1], *reveal, session, loop, idx),
-        ]
+        yield (o[0], o[1], *hidden, session, loop, idx)
+        await asyncio.sleep(0.2)
+        yield (o[0], o[1], *reveal, session, loop, idx)
 
     async def start(session, loop, slot_idx=0):
         if session is None:
             session = SessionState(); session.transition_to(State.INTAKE)
         loop = loop or create_loop()
         o = await _present(session, loop, 0)
-        for frame in _frames(o, loop):
+        async for frame in _emit(o, loop):
             yield frame
 
     async def on_continue(radio_v, grounds_v, docs_v, country_v, text_v, session, loop, idx):
@@ -494,7 +497,7 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
             return
         session.messages = list(session.messages) + [{"role": "user", "content": display}]
         o = await _present(session, loop, _next_index(session, idx))
-        for frame in _frames(o, loop):
+        async for frame in _emit(o, loop):
             yield frame
 
     continue_event = cont.click(
