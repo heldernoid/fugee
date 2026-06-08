@@ -2,10 +2,11 @@
 
 Matches mockup.html #phase-3: a facts sidebar (what the person shared) and a
 live reasoning stream the person can watch, with a progress bar and tool-call
-status chips ("Searching: …"). The agent reasons with the real ``web_search``
-and ``country_lookup`` tools; its final ``@@ASSESSMENT`` block is parsed into
-``session.assessment`` (convention grounds, risk, ranked recommended countries
-attached with authoritative country_lookup data — never the origin country).
+status chips. The agent reasons with local, grounded tools only —
+``guideline_search`` (UNHCR Handbook/Guidelines RAG), ``country_lookup``, and
+``asylum_stats``; there is NO web search. Its final ``@@ASSESSMENT`` block is
+parsed into ``session.assessment`` (convention grounds, risk, ranked recommended
+countries attached with authoritative country_lookup data — never the origin).
 """
 
 from __future__ import annotations
@@ -291,8 +292,6 @@ def _facts_summary(session: SessionState) -> str:
 # --------------------------------------------------------------------------
 
 def _tool_status(name: str, args: dict) -> str:
-    if name == "web_search":
-        return f"Searching: {args.get('query', '')}"
     if name == "country_lookup":
         return f"Looking up: {args.get('country', '')}"
     if name == "asylum_stats":
@@ -323,22 +322,13 @@ async def stream_assessment(session: SessionState, loop):
     status = ""
     looked_up: list[str] = []  # countries the agent actually researched
 
-    # Agentic control (ported from pi's AgentLoopConfig hooks):
-    #  * stop once the structured @@ASSESSMENT block is produced (no rambling)
-    #  * privacy guard: never let the person's free-text story into a web query
+    # Agentic control (ported from pi's AgentLoopConfig hooks): stop once the
+    # structured @@ASSESSMENT block is produced (no rambling). There is no web
+    # search — the tools are all local/curated — so no outbound-query guard.
     def _stop(assistant_message, history):
         return "@@ASSESSMENT" in (assistant_message or {}).get("content", "")
 
-    story = (session.interview.free_text_history or "").strip().lower()
-
-    def _guard(name, args):
-        if name == "web_search" and story:
-            q = str((args or {}).get("query", "")).lower()
-            if story and (story[:40] in q):
-                return {"block": True, "reason": "query contained personal narrative (privacy)"}
-        return None
-
-    hooks = LoopHooks(should_stop_after_turn=_stop, before_tool_call=_guard)
+    hooks = LoopHooks(should_stop_after_turn=_stop)
 
     yield facts_html, render_reason(acc), render_progress(pct, "")
 

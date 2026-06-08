@@ -1,12 +1,12 @@
 """tests/integration/test_assessment.py — real assessment + real tools (T041).
 
 Seeds a real scenario (Ethiopian, political persecution, currently in Sudan) and
-runs the full assessment with the real model and real tools (Tavily web_search,
-country_lookup). No mocks, no fabricated data. Skips cleanly if the model host or
-the Tavily key is unavailable.
+runs the full assessment with the real model and the real LOCAL tools
+(guideline_search, country_lookup, asylum_stats). No web search, no mocks, no
+fabricated data. Skips cleanly if the model host is unavailable.
 
-Covers SC-025 (real web_search), SC-027 (>=1 recommendation), SC-028 (origin
-excluded), SC-029 (session.assessment populated).
+Covers SC-027 (>=1 recommendation), SC-028 (origin excluded), SC-029
+(session.assessment populated).
 """
 
 from __future__ import annotations
@@ -17,7 +17,6 @@ import urllib.request
 import pytest
 
 from agent.loop import create_loop
-from agent.tools.web_search import search
 from app.phases.assessment import stream_assessment
 from app.state.session import SessionState, State
 
@@ -32,7 +31,6 @@ def _host_reachable() -> bool:
 
 
 _needs_model = pytest.mark.skipif(not _host_reachable(), reason="Ollama host not reachable")
-_needs_tavily = pytest.mark.skipif(not os.getenv("TAVILY_API_KEY"), reason="TAVILY_API_KEY not set")
 
 
 def _seed_session() -> SessionState:
@@ -52,18 +50,7 @@ def _seed_session() -> SessionState:
     return s
 
 
-@_needs_tavily
-@pytest.mark.asyncio
-async def test_web_search_real():
-    """SC-025: a real query returns at least one result with a real URL."""
-    out = await search("Kenya asylum Ethiopia 2026", focus="asylum")
-    assert out["results"], "expected at least one search result"
-    first = out["results"][0]
-    assert first["url"].startswith("http")
-
-
 @_needs_model
-@_needs_tavily
 @pytest.mark.asyncio
 async def test_assessment_seeded_scenario():
     session = _seed_session()
