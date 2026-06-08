@@ -38,12 +38,12 @@ _NATIVE_TO_ENGLISH = {native: english for native, english in LANGUAGES}
 INTAKE_CSS = """
 #intake-screen { background: var(--surface); border: 1px solid var(--line);
   border-radius: var(--r-lg); box-shadow: var(--shadow-md); overflow: hidden;
-  max-width: var(--maxw); margin: 0 auto; }
+  max-width: 1000px; width: 100%; margin: 0 auto; }
 .intake-wrap { position:relative; padding:clamp(40px,7vw,84px) clamp(20px,5vw,72px);
   text-align:center; overflow:hidden;
   background:linear-gradient(180deg,#FCFBF7 0%,#F4F1E9 100%); }
 .intake-topo { position:absolute; inset:0; z-index:0; color:var(--primary); opacity:.10; pointer-events:none; }
-.intake-inner { position:relative; z-index:1; max-width:560px; margin:0 auto; }
+.intake-inner { position:relative; z-index:1; max-width:760px; margin:0 auto; }
 .intake-logo { width:64px; height:64px; margin:0 auto 22px; }
 #intake-screen h1.intake-h1 { font-family:var(--font-display); font-size:clamp(38px,6vw,58px);
   font-weight:600; letter-spacing:-.02em; color:var(--primary-deep); margin:0; }
@@ -52,7 +52,7 @@ INTAKE_CSS = """
   text-transform:uppercase; color:var(--text-muted); font-weight:600; }
 
 /* language pills (native Gradio buttons themed as pills) */
-#intake-langs { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; max-width:480px; margin:0 auto; }
+#intake-langs { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; max-width:680px; margin:0 auto; }
 #intake-langs .lang button, #intake-langs button.lang {
   border:1px solid var(--line-strong) !important; background:var(--surface) !important;
   border-radius:var(--r-full) !important; padding:9px 16px !important; font-size:14px !important;
