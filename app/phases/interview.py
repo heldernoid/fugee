@@ -149,9 +149,17 @@ def _next_index(session: SessionState, idx: int) -> int:
     return j
 
 
+# The two multi-select questions get their own pre-mounted controls so their
+# choices are set once (in the person's language) and never swapped at reveal —
+# Gradio lags when it has to populate a CheckboxGroup's choices in the same beat
+# it is shown, which made the options appear only after an extra "Continue".
+_Q_GROUNDS = next(q for q in QUESTIONS if q.field == "persecution_types")
+_Q_DOCS = next(q for q in QUESTIONS if q.field == "documents_available")
+
+
 def _active_control(session: SessionState, idx: int):
     """Return (which, choices) for the active control at ``idx``.
-    which ∈ {"radio","multi","country","text"}."""
+    which ∈ {"radio","grounds","docs","country","text"}."""
     lang = session.language
     if idx == CORRECT_INDEX:
         return "text", None
@@ -161,44 +169,51 @@ def _active_control(session: SessionState, idx: int):
     if q.control == "yesno":
         return "radio", option_labels(lang, q)
     if q.control == "choice":
-        return "multi", option_labels(lang, q)
+        return ("grounds" if q.field == "persecution_types" else "docs"), option_labels(lang, q)
     if q.control == "country":
         return "country", None
     return "text", None
 
 
 def control_updates(session: SessionState, idx: int):
-    """(radio, multi, country, text) updates: active control visible + populated."""
+    """(radio, grounds, docs, country, text) updates: active control visible +
+    populated. The two checkbox groups always carry their full (language-correct)
+    choices so they are populated long before they are ever revealed."""
     which, choices = _active_control(session, idx)
+    lang = session.language
     return (
         gr.update(visible=which == "radio", choices=choices if which == "radio" else None, value=None),
-        gr.update(visible=which == "multi", choices=choices if which == "multi" else None, value=[]),
+        gr.update(visible=which == "grounds", choices=option_labels(lang, _Q_GROUNDS), value=[]),
+        gr.update(visible=which == "docs", choices=option_labels(lang, _Q_DOCS), value=[]),
         gr.update(visible=which == "country", value=None),
         gr.update(visible=which == "text", value=""),
     )
 
 
 def control_frames(session: SessionState, idx: int):
-    """Two passes that defeat Gradio's choices-on-reveal lag:
-    pass 1 sets the choices on the active control while it is still hidden,
-    pass 2 simply reveals it. Returns (hidden_with_choices, reveal)."""
+    """Two passes that defeat Gradio's choices-on-reveal lag for the radio:
+    pass 1 sets choices while hidden, pass 2 reveals. The checkbox groups keep
+    their choices populated throughout, so revealing them is lag-free."""
     which, choices = _active_control(session, idx)
+    lang = session.language
     hidden = (
         gr.update(visible=False, choices=choices if which == "radio" else None, value=None),
-        gr.update(visible=False, choices=choices if which == "multi" else None, value=[]),
+        gr.update(visible=False, choices=option_labels(lang, _Q_GROUNDS), value=[]),
+        gr.update(visible=False, choices=option_labels(lang, _Q_DOCS), value=[]),
         gr.update(visible=False, value=None),
         gr.update(visible=False, value=""),
     )
     reveal = (
         gr.update(visible=which == "radio"),
-        gr.update(visible=which == "multi"),
+        gr.update(visible=which == "grounds"),
+        gr.update(visible=which == "docs"),
         gr.update(visible=which == "country"),
         gr.update(visible=which == "text"),
     )
     return hidden, reveal
 
 
-def _store(session: SessionState, q: Question, radio_v, multi_v, country_v, text_v):
+def _store(session: SessionState, q: Question, radio_v, grounds_v, docs_v, country_v, text_v):
     lang = session.language
     if q.control == "country":
         raw = country_name(country_v) if country_v else (text_v or "").strip()
@@ -213,6 +228,7 @@ def _store(session: SessionState, q: Question, radio_v, multi_v, country_v, text
         setattr(session.interview, q.field, is_yes)
         return radio_v
     if q.control == "choice":
+        multi_v = grounds_v if q.field == "persecution_types" else docs_v
         if not multi_v:
             return None
         # map translated labels back to canonical English labels
@@ -377,9 +393,15 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
                 # Pre-mount with choices so they render immediately when shown
                 # (Gradio is laggy updating choices on a freshly-revealed control).
                 radio = gr.Radio(choices=["Yes", "No"], label="", show_label=False, visible=False, elem_id="iv-choice")
-                multi = gr.CheckboxGroup(
-                    choices=[t("English", oid) for q in QUESTIONS if q.control == "choice" for oid in q.options],
+                # One pre-mounted checkbox group per multi-select question, each
+                # with its own fixed choices — never swapped, so reveal is instant.
+                multi_grounds = gr.CheckboxGroup(
+                    choices=[t("English", oid) for oid in _Q_GROUNDS.options],
                     label="", show_label=False, visible=False, elem_id="iv-multi",
+                )
+                multi_docs = gr.CheckboxGroup(
+                    choices=[t("English", oid) for oid in _Q_DOCS.options],
+                    label="", show_label=False, visible=False, elem_id="iv-multi-docs",
                 )
                 country = gr.Dropdown(choices=country_choices(), label="", show_label=False, visible=False,
                                       allow_custom_value=True, filterable=True, elem_id="iv-country")
@@ -387,7 +409,7 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
                                   placeholder="…", elem_id="iv-text")
                 cont = gr.Button("Continue →", elem_id="iv-continue")
 
-    stream_outputs = [chat, rail, radio, multi, country, text, session_st, loop_st, slot_idx_st]
+    stream_outputs = [chat, rail, radio, multi_grounds, multi_docs, country, text, session_st, loop_st, slot_idx_st]
 
     async def _present(session, loop, idx):
         """Append the agent's message (scripted question, LLM review, or the
@@ -404,13 +426,13 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
         return (render_chat(session.messages), render_rail(session.state),
                 *control_updates(session, idx), session, idx)
 
-    _HIDE4 = (gr.update(visible=False), gr.update(visible=False),
+    _HIDE5 = (gr.update(visible=False), gr.update(visible=False), gr.update(visible=False),
               gr.update(visible=False), gr.update(visible=False))
 
     def _frames(o, loop):
         """Two render passes (see control_frames): pass 1 sets choices while the
         control is hidden, pass 2 reveals it — so choice controls render at once."""
-        session, idx = o[6], o[7]
+        session, idx = o[7], o[8]
         hidden, reveal = control_frames(session, idx)
         return [
             (o[0], o[1], *hidden, session, loop, idx),
@@ -425,7 +447,7 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
         for frame in _frames(o, loop):
             yield frame
 
-    async def on_continue(radio_v, multi_v, country_v, text_v, session, loop, idx):
+    async def on_continue(radio_v, grounds_v, docs_v, country_v, text_v, session, loop, idx):
         if session is None:
             session = SessionState(); session.transition_to(State.INTAKE)
             loop = loop or create_loop()
@@ -458,7 +480,7 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
             if radio_v == t(lang, "review_yes"):
                 advance_to(session, State.ASSESSMENT)  # triggers assessment via .then()
                 yield (render_chat(session.messages), render_rail(session.state),
-                       *_HIDE4, session, loop, idx)
+                       *_HIDE5, session, loop, idx)
                 return
             o = await _present(session, loop, CORRECT_INDEX)  # ask what to change
             for frame in _frames(o, loop):
@@ -466,7 +488,7 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
             return
 
         q = QUESTIONS[idx]
-        display = _store(session, q, radio_v, multi_v, country_v, text_v)
+        display = _store(session, q, radio_v, grounds_v, docs_v, country_v, text_v)
         if display is None:
             yield (gr.update(), gr.update(), *control_updates(session, idx), session, loop, idx)
             return
@@ -477,7 +499,7 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
 
     continue_event = cont.click(
         on_continue,
-        inputs=[radio, multi, country, text, session_st, loop_st, slot_idx_st],
+        inputs=[radio, multi_grounds, multi_docs, country, text, session_st, loop_st, slot_idx_st],
         outputs=stream_outputs,
     )
 
