@@ -118,10 +118,13 @@ def _record_for_signatory(entry: dict) -> dict:
 
 def _record_for_non_signatory(entry: dict) -> dict:
     languages = entry.get("languages", []) or []
+    pathways = entry.get("alternative_pathways", {}) or {}
+    work_visa = pathways.get("work_visa", {}) or {}
     return {
         "country": entry.get("name"),
         "flag": entry.get("flag"),
         "tier": entry.get("tier"),
+        "region": entry.get("region"),
         "isSignatory": False,
         "unhcrPresence": False,
         "unhcrOffice": None,
@@ -132,13 +135,42 @@ def _record_for_non_signatory(entry: dict) -> dict:
         "languages": languages,
         "requiredDocuments": [],
         "legalAidOrgs": [],
-        "alternativePathways": entry.get("alternative_pathways", {}),
+        "alternativePathways": pathways,
+        "workVisa": work_visa,                              # {exists, requirement}
+        "economicOpportunity": entry.get("economic_opportunity"),
+        "strategicGuidance": entry.get("strategic_guidance"),  # honest caveats
+        "kafala": entry.get("kafala"),
         "safety": entry.get("safety"),
         "warning": (
             "Not a party to the 1951 Refugee Convention — no formal asylum system. "
             "May offer temporary or alternative pathways; not a durable solution."
         ),
     }
+
+
+# Curated labour-migration shortlist for economic (non-protection) cases. These
+# are the non-signatory countries whose curated data records a real work-visa
+# pathway — historically the most accessible labour markets for foreign workers
+# (Gulf states with employer sponsorship), unlike Western countries that
+# prioritise their own/EU nationals with strict visa criteria. Ordered by a
+# blend of labour-market size and safety; each carries its own honest
+# ``strategicGuidance`` caveat so the recommendation is never blind.
+_WORK_ROUTE_ORDER = ["UAE", "QAT", "SAU", "OMN", "BHR"]
+
+
+def work_route_countries() -> list[dict]:
+    """Ranked work-visa destinations for an economic-migration case (not asylum)."""
+    data = _load_curated_with_stats()
+    ns = data.get("non_signatories", {})
+    picks: list[dict] = []
+    for iso3 in _WORK_ROUTE_ORDER:
+        entry = ns.get(iso3)
+        if not entry:
+            continue
+        work_visa = (entry.get("alternative_pathways", {}) or {}).get("work_visa", {}) or {}
+        if work_visa.get("exists"):
+            picks.append(_record_for_non_signatory(entry))
+    return picks
 
 
 def lookup_country(country: str) -> dict:
@@ -179,4 +211,4 @@ country_lookup_tool = AgentTool(
 )
 
 
-__all__ = ["country_lookup_tool", "lookup_country", "resolve_iso3"]
+__all__ = ["country_lookup_tool", "lookup_country", "resolve_iso3", "work_route_countries"]

@@ -18,7 +18,7 @@ import gradio as gr
 from agent.events import ErrorEvent, TextDeltaEvent, ToolEndEvent, ToolStartEvent
 from agent.loop import LoopHooks
 from agent.tools.asylum_stats import asylum_stats_tool
-from agent.tools.country_lookup import country_lookup_tool, lookup_country
+from agent.tools.country_lookup import country_lookup_tool, lookup_country, work_route_countries
 from agent.tools.guideline_search import guideline_search_tool
 from app.assessment_parse import parse_assessment
 from app.mdlite import md_to_html
@@ -277,11 +277,21 @@ async def stream_assessment(session: SessionState, loop):
 
     recs: list[dict] = []
     seen: set[str] = set()
-    _collect(result.countries, recs, seen)
-    # Fallback: if the structured block yielded no resolvable countries, use the
-    # ones the agent actually looked up during reasoning (real, not fabricated).
-    if not recs:
-        _collect(looked_up, recs, seen)
+    if result.case_type == "economic_or_other":
+        # Not a protection case: asylum destinations would be misleading. Use the
+        # curated labour-migration shortlist (work-visa countries) deterministically
+        # — never the small model's possibly-Western asylum picks.
+        for rec in work_route_countries():
+            cname = (rec.get("country") or "").strip()
+            if cname and cname.lower() != origin and cname.lower() not in seen:
+                seen.add(cname.lower())
+                recs.append(rec)
+    else:
+        _collect(result.countries, recs, seen)
+        # Fallback: if the structured block yielded no resolvable countries, use the
+        # ones the agent actually looked up during reasoning (real, not fabricated).
+        if not recs:
+            _collect(looked_up, recs, seen)
 
     # Guarantee a readable reasoning even if the model skipped narration.
     if len(visible.strip()) < 80:

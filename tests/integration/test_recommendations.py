@@ -7,10 +7,11 @@ roadmap behave. No model needed — the assessment output is the real-data input
 
 import gradio as gr
 
-from agent.tools.country_lookup import lookup_country
+from agent.tools.country_lookup import lookup_country, work_route_countries
 from app.phases.recommendations import (
     build,
     card_body_html,
+    is_economic_case,
     match_strength,
     roadmap_html,
     select_country,
@@ -70,6 +71,55 @@ def test_populate_shows_cards_and_autoselects_first():
     with gr.Blocks():
         ui = build(visible=False, session_st=gr.State(None))
     updates = ui.populate(s)
-    # render_outputs = [slot,card,btn]*3 + [roadmap] = 10 updates
+    # render_outputs = [intro] + [slot,card,btn]*3 + [roadmap, proceed]
     assert len(updates) == len(ui.render_outputs)
     assert s.selected_country == "Kenya"  # top recommendation auto-selected
+
+
+# --- economic (non-protection) case: must NOT present asylum -----------------
+
+def _seed_economic_case() -> SessionState:
+    s = _seed_completed_assessment()
+    s.interview.origin_country = "Bangladesh"
+    s.assessment.case_type = "economic_or_other"
+    s.assessment.recommended_countries = work_route_countries()[:3]
+    s.selected_country = None
+    return s
+
+
+def test_economic_shortlist_is_work_visa_countries_not_asylum():
+    recs = work_route_countries()
+    assert recs, "expected a curated work-visa shortlist"
+    names = {r["country"] for r in recs}
+    assert "United Arab Emirates" in names  # Gulf labour market
+    for r in recs:
+        assert r["workVisa"].get("exists") is True
+        assert r["isSignatory"] is False  # not asylum destinations
+
+
+def test_economic_cards_use_work_route_framing():
+    s = _seed_economic_case()
+    assert is_economic_case(s) is True
+    for rec in s.assessment.recommended_countries:
+        html = card_body_html(rec, economic=True)
+        assert "Work route" in html            # not "Strong match"
+        assert "Recognition rate" not in html  # no asylum recognition rate
+        assert "Work visa" in html
+
+
+def test_economic_roadmap_is_labour_not_asylum():
+    rec = work_route_countries()[0]
+    rm = roadmap_html(rec, economic=True)
+    assert "work-route roadmap" in rm.lower()
+    assert "Register with UNHCR" not in rm  # not the asylum RSD roadmap
+    assert "asylum" not in rm.lower()
+
+
+def test_economic_case_hides_document_proceed():
+    s = _seed_economic_case()
+    with gr.Blocks():
+        ui = build(visible=False, session_st=gr.State(None))
+    updates = ui.populate(s)
+    # last update is the "Prepare my documents" button — hidden for economic cases
+    proceed_update = updates[-1]
+    assert proceed_update.get("visible") is False

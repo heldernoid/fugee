@@ -37,6 +37,10 @@ RECO_CSS = """
 .badge { font-size:11.5px; font-weight:700; letter-spacing:.03em; padding:4px 10px; border-radius:var(--r-full); text-transform:uppercase; }
 .badge--strong { background:var(--success-tint); color:#1d6b41; }
 .badge--moderate { background:var(--warning-tint); color:#8a6414; }
+.badge--work { background:var(--accent-tint); color:#8a4a1a; }
+.ccard__caveat { font-size:12.5px; line-height:1.5; color:#8a5a2a; background:var(--accent-tint);
+  border-radius:var(--r-sm); padding:9px 11px; display:flex; gap:8px; }
+.ccard__caveat::before { content:"⚠"; flex:0 0 auto; }
 .ccard__facts { display:flex; flex-direction:column; gap:9px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); padding:14px 0; }
 .ccard__facts .f { display:flex; justify-content:space-between; gap:10px; font-size:13.5px; }
 .ccard__facts .f span { color:var(--text-muted); }
@@ -115,12 +119,51 @@ def _language_label(rec: dict) -> str:
     return ", ".join(langs[:2]) if langs else "—"
 
 
-def card_body_html(rec: dict) -> str:
+def _work_visa_label(rec: dict) -> str:
+    wv = rec.get("workVisa") or {}
+    if wv.get("exists"):
+        req = wv.get("requirement")
+        return f"Yes — {req}" if req else "Yes"
+    return "Limited"
+
+
+def card_body_html(rec: dict, economic: bool = False) -> str:
+    flag = rec.get("flag", "")
+    name = html.escape(rec.get("country", "Unknown"))
+    if economic:
+        # Work-migration framing — NOT an asylum claim. No recognition rate / RSD.
+        badge_cls, badge_txt = "badge--work", "Work route"
+        facts = [
+            ("Work visa", _work_visa_label(rec)),
+            ("Job market", str(rec.get("economicOpportunity") or "—")),
+            ("Primary language", _language_label(rec)),
+            ("Region", str(rec.get("region") or "—")),
+        ]
+        facts_html = "".join(
+            f'<div class="f"><span>{html.escape(k)}</span><b>{html.escape(v)}</b></div>'
+            for k, v in facts
+        )
+        caveat = rec.get("strategicGuidance")
+        caveat_html = f'<div class="ccard__caveat">{html.escape(str(caveat))}</div>' if caveat else ""
+        prep = [
+            "A confirmed job offer from a licensed employer who will sponsor your visa",
+            "A valid passport — keep it in your own hands at all times",
+            "A written contract you understand before you travel; never pay illegal recruitment fees",
+        ]
+        prep_items = "".join(f"<li>{html.escape(p)}</li>" for p in prep)
+        return (
+            '<div class="ccard__top">'
+            f'<span class="ccard__flag">{flag}</span>'
+            f'<div><div class="ccard__name">{name}</div>'
+            f'<span class="badge {badge_cls}">{badge_txt}</span></div></div>'
+            f'<div class="ccard__facts">{facts_html}</div>'
+            f"{caveat_html}"
+            '<details class="prep"><summary>▸ What you need to prepare</summary>'
+            f"<ul>{prep_items}</ul></details>"
+        )
     strength = match_strength(rec)
     badge_cls = "badge--strong" if strength == "strong" else "badge--moderate"
     badge_txt = "Strong match" if strength == "strong" else "Moderate match"
-    flag = rec.get("flag", "")
-    name = html.escape(rec.get("country", "Unknown"))
     facts = [
         ("Processing time", _processing_label(rec)),
         ("UNHCR office", _unhcr_label(rec)),
@@ -153,39 +196,71 @@ def _contact(rec: dict) -> str:
     return f"UNHCR {office}" if office else "UNHCR office"
 
 
-def roadmap_html(rec: dict | None) -> str:
+def _work_roadmap_steps(rec: dict) -> list[tuple]:
+    """Honest labour-migration steps (employer-sponsored work visa), not asylum."""
+    return [
+        ("Find a job offer and a sponsor",
+         "A licensed employer must offer you a job and sponsor your work visa. "
+         "Use official job portals and licensed recruitment agencies only — never "
+         "informal 'agents' or smugglers.",
+         "Licensed employer / recruiter", "Varies"),
+        ("Employer applies for your work permit",
+         "Your sponsor applies to the labour ministry for your work permit and "
+         "entry visa. You should not be asked to pay for this yourself.",
+         "Sponsor + labour ministry", "Weeks to months"),
+        ("Medical, contract and visa",
+         "Complete the required medical check and read your contract carefully "
+         "before signing. Keep your own passport — do not hand it over.",
+         "Embassy / visa centre", "Before travel"),
+        ("Arrival and residence permit",
+         "On arrival your employer arranges your residence permit (e.g. Iqama/ID). "
+         "Confirm your job, pay and housing match your signed contract.",
+         "On arrival", "First weeks"),
+        ("Know your rights",
+         "Sponsorship (kafala) often ties your visa to your employer. Keep copies "
+         "of your documents and contact your embassy or a labour helpline if you "
+         "are mistreated or unpaid.",
+         "Your embassy · labour helpline", "Ongoing"),
+    ]
+
+
+def roadmap_html(rec: dict | None, economic: bool = False) -> str:
     if not rec:
         return '<div id="reco-roadmap" style="display:none"></div>'
     name = html.escape(rec.get("country", ""))
     flag = rec.get("flag", "")
-    office = rec.get("unhcrOffice")
-    unhcr_contact = f"UNHCR {office}" if office else "UNHCR office"
-    legal = _contact(rec)
-    months = rec.get("processingTimeMonths")
-    total_time = f"~{months} months total" if months else "varies"
-
-    steps = [
-        ("Register with UNHCR",
-         "Get a registration appointment and an asylum-seeker certificate, which "
-         "protects you from being returned.",
-         unhcr_contact, "1–4 weeks for appointment"),
-        ("File your asylum claim",
-         "Submit your personal statement and supporting evidence. Fugee has "
-         "already drafted these for you.",
-         "Asylum authority / RSD unit", "Same week as registration"),
-        ("Refugee status interview (RSD)",
-         "A protection officer hears your account. Free legal aid can prepare and "
-         "accompany you.",
-         legal, "months after filing"),
-        ("Decision",
-         "If recognised, you receive refugee status. If not, you have the right "
-         "to appeal.",
-         "Written decision · appeal possible", total_time),
-        ("Integration support",
-         "Access schooling for your children, healthcare, and the right to work "
-         "or a resettlement referral.",
-         "UNHCR partners · community orgs", "Ongoing"),
-    ]
+    if economic:
+        steps = _work_roadmap_steps(rec)
+        head_title = "Your work-route roadmap"
+    else:
+        office = rec.get("unhcrOffice")
+        unhcr_contact = f"UNHCR {office}" if office else "UNHCR office"
+        legal = _contact(rec)
+        months = rec.get("processingTimeMonths")
+        total_time = f"~{months} months total" if months else "varies"
+        head_title = "Your roadmap"
+        steps = [
+            ("Register with UNHCR",
+             "Get a registration appointment and an asylum-seeker certificate, which "
+             "protects you from being returned.",
+             unhcr_contact, "1–4 weeks for appointment"),
+            ("File your asylum claim",
+             "Submit your personal statement and supporting evidence. Fugee has "
+             "already drafted these for you.",
+             "Asylum authority / RSD unit", "Same week as registration"),
+            ("Refugee status interview (RSD)",
+             "A protection officer hears your account. Free legal aid can prepare and "
+             "accompany you.",
+             legal, "months after filing"),
+            ("Decision",
+             "If recognised, you receive refugee status. If not, you have the right "
+             "to appeal.",
+             "Written decision · appeal possible", total_time),
+            ("Integration support",
+             "Access schooling for your children, healthcare, and the right to work "
+             "or a resettlement referral.",
+             "UNHCR partners · community orgs", "Ongoing"),
+        ]
     rows = []
     for i, (title, desc, contact, time) in enumerate(steps, start=1):
         rows.append(
@@ -199,7 +274,7 @@ def roadmap_html(rec: dict | None) -> str:
             "</div></div></div>"
         )
     return (
-        '<div id="reco-roadmap"><div class="roadmap__head"><h3>Your roadmap</h3>'
+        f'<div id="reco-roadmap"><div class="roadmap__head"><h3>{html.escape(head_title)}</h3>'
         f'<span class="for">for <b>{flag} {name}</b> · updates if you choose another country</span>'
         f'</div><div class="steps">{"".join(rows)}</div></div>'
     )
@@ -207,6 +282,31 @@ def roadmap_html(rec: dict | None) -> str:
 
 def _recs(session: SessionState) -> list[dict]:
     return (session.assessment.recommended_countries or [])[:MAX_CARDS]
+
+
+def is_economic_case(session: SessionState) -> bool:
+    """Economic / non-protection case — asylum cards & RSD roadmap don't apply."""
+    return getattr(session.assessment, "case_type", None) == "economic_or_other"
+
+
+_PROTECTION_INTRO = (
+    '<p class="reco__intro">Based on your situation, these are the safest and most '
+    "achievable options near you. Each is matched to your profile — not a generic "
+    "ranking.</p>"
+)
+_ECONOMIC_INTRO = (
+    '<p class="reco__intro">From what you shared, your situation looks mainly '
+    "<b>economic</b> — the search for work and a better income. That is real and "
+    "hard, but it is important to be honest: <b>asylum is not the right route for "
+    "economic migration</b>, and a refused asylum claim can leave you stuck, unable "
+    "to work, and at risk of removal. Instead, here are real <b>work-migration</b> "
+    "destinations with active routes for foreign workers — read each one's guidance "
+    "carefully, because they come with conditions.</p>"
+)
+
+
+def intro_html(session: SessionState) -> str:
+    return _ECONOMIC_INTRO if is_economic_case(session) else _PROTECTION_INTRO
 
 
 def select_country(session: SessionState, index: int) -> SessionState:
@@ -236,11 +336,7 @@ def build(visible: bool = False, session_st: gr.State | None = None) -> Recommen
 
     with gr.Column(visible=visible, elem_classes=["screen-wrap"]) as column:
         with gr.Column(elem_id="reco-screen"):
-            gr.HTML(
-                '<p class="reco__intro">Based on your situation, these are the safest and '
-                "most achievable options near you. Each is matched to your profile — not a "
-                "generic ranking.</p>"
-            )
+            intro = gr.HTML(_PROTECTION_INTRO)
             with gr.Row(elem_id="reco-cards"):
                 for i in range(MAX_CARDS):
                     with gr.Column(elem_classes=["ccard-slot"], visible=False) as slot:
@@ -253,29 +349,33 @@ def build(visible: bool = False, session_st: gr.State | None = None) -> Recommen
             with gr.Row(elem_id="reco-proceed-row"):
                 proceed = gr.Button("Prepare my documents →", elem_id="reco-proceed")
 
-    render_outputs = []
+    render_outputs = [intro]
     for i in range(MAX_CARDS):
         render_outputs += [slots[i], cards[i], btns[i]]
-    render_outputs.append(roadmap)
+    render_outputs += [roadmap, proceed]
 
     def _updates(session: SessionState) -> list:
         recs = _recs(session)
+        economic = is_economic_case(session)
         selected = session.selected_country
-        out = []
+        out = [gr.update(value=intro_html(session))]
         for i in range(MAX_CARDS):
             if i < len(recs):
                 rec = recs[i]
                 is_sel = selected == rec.get("country")
                 classes = ["ccard-slot", "is-selected"] if is_sel else ["ccard-slot"]
                 out.append(gr.update(visible=True, elem_classes=classes))
-                out.append(gr.update(value=card_body_html(rec)))
+                out.append(gr.update(value=card_body_html(rec, economic=economic)))
                 out.append(gr.update(visible=True, value="✓ Selected" if is_sel else "Select this country"))
             else:
                 out.append(gr.update(visible=False))
                 out.append(gr.update(value=""))
                 out.append(gr.update(visible=False))
         sel_rec = next((r for r in recs if r.get("country") == selected), None)
-        out.append(gr.update(value=roadmap_html(sel_rec)))
+        out.append(gr.update(value=roadmap_html(sel_rec, economic=economic)))
+        # An economic case is not an asylum claim, so don't offer to generate an
+        # asylum document package. The work-route guidance is the destination.
+        out.append(gr.update(visible=not economic))
         return out
 
     def populate(session: SessionState) -> list:
