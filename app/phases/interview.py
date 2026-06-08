@@ -10,7 +10,6 @@ mismatched controls, drift). Answers are captured straight into
 
 from __future__ import annotations
 
-import asyncio
 import html
 import re
 
@@ -431,16 +430,14 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
               gr.update(visible=False), gr.update(visible=False))
 
     async def _emit(o, loop):
-        """Two render passes (see control_frames): pass 1 sets choices while the
-        control is hidden, pass 2 reveals it. A real beat between the two yields
-        forces the client to paint them as separate cycles — otherwise Gradio can
-        coalesce the choices-update and the reveal into one frame, which makes a
-        revealed CheckboxGroup render empty until the next click."""
+        """Reveal the active control in a SINGLE update that carries both
+        ``visible`` and ``choices`` together. A CheckboxGroup whose choices were
+        set while it was hidden builds no option DOM, so revealing it with a
+        ``visible``-only update paints it empty — the choices must ride along on
+        the reveal (this is exactly what the Continue path does, which worked).
+        ``o[2:7]`` are the control_updates from ``_present``."""
         session, idx = o[7], o[8]
-        hidden, reveal = control_frames(session, idx)
-        yield (o[0], o[1], *hidden, session, loop, idx)
-        await asyncio.sleep(0.2)
-        yield (o[0], o[1], *reveal, session, loop, idx)
+        yield (o[0], o[1], o[2], o[3], o[4], o[5], o[6], session, loop, idx)
 
     async def start(session, loop, slot_idx=0):
         if session is None:

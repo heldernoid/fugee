@@ -173,6 +173,25 @@ def work_route_countries() -> list[dict]:
     return picks
 
 
+# Curated strong-asylum destinations — tier-1 signatories with full procedures
+# and UNHCR presence. Used only as a last-resort fallback for a protection case
+# when the model named no resolvable country, so the recommendations screen is
+# never empty. Real records, never fabricated.
+_STRONG_ASYLUM_ORDER = ["CAN", "DEU", "FRA", "SWE", "NLD", "GBR", "ESP"]
+
+
+def strong_asylum_destinations() -> list[dict]:
+    """Fallback shortlist of robust asylum systems (real signatory records)."""
+    data = _load_curated_with_stats()
+    sig = data.get("signatories", {})
+    picks: list[dict] = []
+    for iso3 in _STRONG_ASYLUM_ORDER:
+        entry = sig.get(iso3)
+        if entry:
+            picks.append(_record_for_signatory(entry))
+    return picks
+
+
 def lookup_country(country: str) -> dict:
     """Synchronous core (also handy for unit tests)."""
     entry = _lookup(country)
@@ -211,4 +230,5 @@ country_lookup_tool = AgentTool(
 )
 
 
-__all__ = ["country_lookup_tool", "lookup_country", "resolve_iso3", "work_route_countries"]
+__all__ = ["country_lookup_tool", "lookup_country", "resolve_iso3",
+           "work_route_countries", "strong_asylum_destinations"]

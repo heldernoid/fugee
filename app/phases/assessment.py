@@ -18,7 +18,12 @@ import gradio as gr
 from agent.events import ErrorEvent, TextDeltaEvent, ToolEndEvent, ToolStartEvent
 from agent.loop import LoopHooks
 from agent.tools.asylum_stats import asylum_stats_tool
-from agent.tools.country_lookup import country_lookup_tool, lookup_country, work_route_countries
+from agent.tools.country_lookup import (
+    country_lookup_tool,
+    lookup_country,
+    strong_asylum_destinations,
+    work_route_countries,
+)
 from agent.tools.guideline_search import guideline_search_tool
 from app.assessment_parse import parse_assessment
 from app.mdlite import md_to_html
@@ -144,29 +149,127 @@ _CASE_LABEL = {
 }
 
 
-def _synth_reasoning(session: SessionState, result, recs: list[dict]) -> str:
-    """Readable fallback summary if the model returned only the structured block."""
+# Maps the interview's persecution-type labels to 1951 Convention grounds, so a
+# substantive analysis can be derived deterministically even if the model is terse.
+_GROUND_MAP = {
+    "Political": "political opinion",
+    "Ethnic": "race or nationality (ethnicity)",
+    "Religious": "religion",
+    "Gender-based": "membership of a particular social group (gender)",
+    "Sexual orientation": "membership of a particular social group (sexual orientation)",
+}
+
+
+def _derive_case(session: SessionState) -> tuple[str, list[str], str]:
+    """Deterministic (case_type, grounds, risk) read from the interview alone —
+    the safety net when the model returns nothing parseable."""
     iv = session.interview
-    lines = []
-    if iv.origin_country:
-        lines.append(f"Based on what you shared, you are from {iv.origin_country}"
-                     + (f" and are currently in {iv.current_country}" if iv.current_country else "") + ".")
+    types = iv.persecution_types or []
+    grounds = [_GROUND_MAP[t] for t in types if t in _GROUND_MAP]
+    if grounds:
+        case = "refugee"
+    elif "Climate displacement" in types:
+        case = "broader_protection"
+    elif iv.immediate_danger:
+        case = "unclear"
+    else:
+        case = "economic_or_other"
+    risk = "high" if iv.immediate_danger else ("moderate" if grounds else "low")
+    return case, grounds, risk
+
+
+def _join(items: list[str]) -> str:
+    items = [i for i in items if i]
+    if not items:
+        return ""
+    if len(items) == 1:
+        return items[0]
+    return ", ".join(items[:-1]) + " and " + items[-1]
+
+
+def _rec_reason(rec: dict) -> str:
+    bits = []
+    if rec.get("unhcrOffice"):
+        bits.append(f"UNHCR office in {rec['unhcrOffice']}")
+    elif rec.get("unhcrPresence"):
+        bits.append("UNHCR presence")
+    rate = rec.get("acceptanceRate")
+    if rate not in (None, "", "PENDING"):
+        try:
+            pct = float(rate)
+            pct = pct * 100 if pct <= 1 else pct
+            bits.append(f"~{round(pct)}% recognition recently")
+        except (TypeError, ValueError):
+            pass
+    langs = rec.get("languages") or ([rec["primaryLanguage"]] if rec.get("primaryLanguage") else [])
+    if langs:
+        bits.append(f"{', '.join(langs[:2])} spoken")
+    return "; ".join(bits)
+
+
+def _synth_reasoning(session: SessionState, result, recs: list[dict],
+                     case_type: str, grounds: list[str], risk: str) -> str:
+    """A substantive, readable analysis built deterministically from the facts —
+    used when the model's own narration was too thin to show. Markdown so the
+    renderer gives it structure (bold, bullets)."""
+    iv = session.interview
+    in_origin = bool(iv.current_country and iv.origin_country
+                     and iv.current_country.strip().lower() == iv.origin_country.strip().lower())
+    paras: list[str] = []
+
+    # 1 — the situation
+    where = f"you are from **{iv.origin_country}**" if iv.origin_country else "I've read your situation"
+    if in_origin:
+        where += f", and you are still inside {iv.current_country} — the country you fear"
+    elif iv.current_country:
+        where += f", and you are now in **{iv.current_country}**"
+    p1 = f"Based on what you shared, {where}."
     if iv.free_text_history:
-        lines.append(f"You told me: {iv.free_text_history}")
-    ct = result.case_type or session.assessment.case_type
-    if ct:
-        lines.append(f"This appears to be {_CASE_LABEL.get(ct, ct)}.")
-    if result.grounds:
-        lines.append("Relevant ground(s): " + ", ".join(result.grounds) + ".")
-    if result.risk:
-        lines.append(f"Overall risk: {result.risk}.")
-    if recs:
-        names = ", ".join(r.get("country", "") for r in recs if r.get("country"))
-        if names:
-            lines.append(f"Realistic destinations to consider: {names}.")
-    if not lines:
-        lines.append("I could not complete a full assessment from the information provided.")
-    return "\n".join(lines)
+        p1 += f" In your words: “{iv.free_text_history.strip().rstrip('.')}.”"
+    paras.append(p1)
+
+    # 2 — what kind of case this is
+    g = result.grounds or grounds
+    p2 = f"**What this means:** this looks like {_CASE_LABEL.get(case_type, case_type)}."
+    if g:
+        p2 += f" The Convention ground that fits your situation is {_join(g)}."
+    if case_type == "refugee":
+        p2 += (" Under the 1951 Refugee Convention, a person with a well‑founded fear "
+               "of persecution on such a ground, who cannot rely on their own state for "
+               "protection, qualifies for refugee status.")
+    paras.append(p2)
+
+    # 3 — risk and why protection must be sought elsewhere
+    r = (result.risk or risk or "").lower()
+    risk_word = {"high": "high", "moderate": "moderate", "low": "lower"}.get(r, r)
+    if risk_word:
+        p3 = f"**The risk you face looks {risk_word}**"
+        p3 += ", and you told me you are in immediate danger." if iv.immediate_danger else "."
+        if in_origin and case_type in ("refugee", "broader_protection", "unclear"):
+            p3 += (f" Because you are still in {iv.current_country}, you cannot be protected "
+                   "there — to claim asylum you will need to reach a country with an active "
+                   "asylum system and register with UNHCR or the authorities on arrival.")
+        paras.append(p3)
+
+    # 4 — where to go
+    if recs and case_type == "economic_or_other":
+        names = _join([r_.get("country", "") for r_ in recs])
+        paras.append("Asylum is not the right route for this. Countries with accessible "
+                     f"work‑visa pathways for foreign workers to consider: **{names}** — "
+                     "read each one's conditions carefully.")
+    elif recs:
+        lines = []
+        for rec in recs[:3]:
+            reason = _rec_reason(rec)
+            lines.append(f"- **{rec.get('country')}**" + (f" — {reason}" if reason else ""))
+        paras.append("**Realistic places to seek protection**, with active asylum "
+                     "programmes that fit your profile:\n" + "\n".join(lines))
+
+    # 5 — what's next
+    if case_type != "economic_or_other" and recs:
+        paras.append("Next I'll show you these destinations with a step‑by‑step roadmap, "
+                     "and prepare your documents so you're ready to file.")
+    return "\n\n".join(paras)
 
 
 def _facts_summary(session: SessionState) -> str:
@@ -275,31 +378,42 @@ async def stream_assessment(session: SessionState, loop):
             seen.add(cname.lower())
             into.append(rec)
 
+    # Fall back to a deterministic read of the interview for anything the model
+    # left blank, so the case is never classified as "nothing".
+    case_d, grounds_d, risk_d = _derive_case(session)
+    case_type = result.case_type or case_d
+
+    def _add(rec: dict) -> None:
+        cname = (rec.get("country") or "").strip()
+        if cname and not rec.get("error") and cname.lower() != origin and cname.lower() not in seen:
+            seen.add(cname.lower())
+            recs.append(rec)
+
     recs: list[dict] = []
     seen: set[str] = set()
-    if result.case_type == "economic_or_other":
+    if case_type == "economic_or_other":
         # Not a protection case: asylum destinations would be misleading. Use the
         # curated labour-migration shortlist (work-visa countries) deterministically
         # — never the small model's possibly-Western asylum picks.
         for rec in work_route_countries():
-            cname = (rec.get("country") or "").strip()
-            if cname and cname.lower() != origin and cname.lower() not in seen:
-                seen.add(cname.lower())
-                recs.append(rec)
+            _add(rec)
     else:
         _collect(result.countries, recs, seen)
-        # Fallback: if the structured block yielded no resolvable countries, use the
-        # ones the agent actually looked up during reasoning (real, not fabricated).
+        # Fallback: the countries the agent actually looked up during reasoning…
         if not recs:
             _collect(looked_up, recs, seen)
+        # …and a last-resort curated shortlist so the screen is never empty.
+        if not recs:
+            for rec in strong_asylum_destinations():
+                _add(rec)
 
-    # Guarantee a readable reasoning even if the model skipped narration.
-    if len(visible.strip()) < 80:
-        visible = _synth_reasoning(session, result, recs)
+    # Guarantee a substantive reasoning even if the model's narration was thin.
+    if len(visible.strip()) < 120:
+        visible = _synth_reasoning(session, result, recs, case_type, grounds_d, risk_d)
 
-    session.assessment.convention_grounds = result.grounds
-    session.assessment.risk_level = result.risk
-    session.assessment.case_type = result.case_type
+    session.assessment.convention_grounds = result.grounds or grounds_d
+    session.assessment.risk_level = result.risk or risk_d
+    session.assessment.case_type = case_type
     session.assessment.reasoning_trace = visible
     session.assessment.recommended_countries = recs
     advance_to(session, State.RECOMMENDATIONS)
