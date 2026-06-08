@@ -164,7 +164,7 @@ def build(visible: bool = True) -> IntakeUI:
     """Build the intake screen inside the current gr.Blocks context."""
     selected_lang = gr.State(None)
 
-    with gr.Column(visible=visible) as column:
+    with gr.Column(visible=visible, elem_classes=["screen-wrap"]) as column:
         with gr.Column(elem_id="intake-screen"):
             gr.HTML(_HEADER_HTML)
             with gr.Row(elem_id="intake-langs"):

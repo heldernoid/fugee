@@ -81,7 +81,7 @@ def _checklist_values(session: SessionState) -> list[str]:
 def build(visible: bool = False, session_st: gr.State | None = None) -> DocumentsUI:
     session_st = session_st or gr.State(None)
 
-    with gr.Column(visible=visible) as column:
+    with gr.Column(visible=visible, elem_classes=["screen-wrap"]) as column:
         with gr.Column(elem_id="docs-screen"):
             with gr.Row(elem_classes=["pkg"]):
                 with gr.Column(elem_classes=["pkg__preview"]):

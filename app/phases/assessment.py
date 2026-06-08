@@ -316,7 +316,7 @@ def build(visible: bool = False, session_st: gr.State | None = None, loop_st: gr
     session_st = session_st or gr.State(None)
     loop_st = loop_st or gr.State(None)
 
-    with gr.Column(visible=visible) as column:
+    with gr.Column(visible=visible, elem_classes=["screen-wrap"]) as column:
         with gr.Column(elem_id="assess-screen"):
             with gr.Row(elem_classes=["assess"]):
                 facts = gr.HTML('<aside class="assess__facts"></aside>')

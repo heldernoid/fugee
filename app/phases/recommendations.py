@@ -234,7 +234,7 @@ def build(visible: bool = False, session_st: gr.State | None = None) -> Recommen
     session_st = session_st or gr.State(None)
     slots, cards, btns = [], [], []
 
-    with gr.Column(visible=visible) as column:
+    with gr.Column(visible=visible, elem_classes=["screen-wrap"]) as column:
         with gr.Column(elem_id="reco-screen"):
             gr.HTML(
                 '<p class="reco__intro">Based on your situation, these are the safest and '

@@ -66,6 +66,12 @@ body, .gradio-container { background: var(--bg) !important; color: var(--text);
 .gradio-container .form { background: transparent !important; border: none !important;
   box-shadow: none !important; }
 .gradio-container .gap { gap: var(--s-sm); }
+
+/* Every phase wrapper fills the shell so all five screens render at the SAME
+   width. Without this, the Gradio column shrink-wraps to its content and each
+   card collapses to a different width (intake ~680, interview ~560, etc.). */
+.screen-wrap { width: 100% !important; align-self: stretch !important; }
+.screen-wrap > .block, .screen-wrap > div { width: 100% !important; }
 .gradio-container :focus-visible { outline: 3px solid var(--accent) !important;
   outline-offset: 2px; border-radius: var(--r-sm); }
 

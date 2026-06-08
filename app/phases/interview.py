@@ -368,7 +368,7 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
     loop_st = loop_st or gr.State(None)
     slot_idx_st = slot_idx_st or gr.State(0)
 
-    with gr.Column(visible=visible) as column:
+    with gr.Column(visible=visible, elem_classes=["screen-wrap"]) as column:
         with gr.Column(elem_id="iv-screen"):
             rail = gr.HTML(render_rail(State.SITUATION))
             chat = gr.HTML(render_chat([]))
