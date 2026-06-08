@@ -115,6 +115,31 @@ def test_economic_roadmap_is_labour_not_asylum():
     assert "asylum" not in rm.lower()
 
 
+def test_pakistan_non_signatory_excluded_from_protection():
+    # Pakistan has no asylum system; it must read as a non-signatory so the
+    # assessment's protection filter drops it (and the roadmap won't claim UNHCR).
+    pk = lookup_country("Pakistan")
+    assert pk.get("isSignatory") is False
+    assert pk.get("unhcrPresence") is False
+    # the curated strong-asylum fallback is all signatories
+    from agent.tools.country_lookup import strong_asylum_destinations
+    assert all(r.get("isSignatory") for r in strong_asylum_destinations())
+
+
+def test_roadmap_without_unhcr_does_not_claim_unhcr():
+    rec = {"country": "Testland", "flag": "", "unhcrPresence": False,
+           "unhcrOffice": None, "processingTimeMonths": 12}
+    rm = roadmap_html(rec)
+    assert "Register with UNHCR" not in rm
+    assert "Register your asylum claim" in rm
+    assert "National asylum authority" in rm
+
+
+def test_roadmap_with_unhcr_uses_unhcr():
+    rm = roadmap_html(lookup_country("Kenya"))  # signatory with UNHCR presence
+    assert "Register with UNHCR" in rm
+
+
 def test_economic_case_hides_document_proceed():
     s = _seed_economic_case()
     with gr.Blocks():

@@ -96,7 +96,12 @@ INTERVIEW_CSS = """
 #iv-responder { border-top:1px solid var(--line); background:var(--surface-2); padding:clamp(16px,4vw,24px); }
 #iv-responder .label-row { font-size:12px; letter-spacing:.04em; text-transform:uppercase;
   color:var(--text-muted); font-weight:600; margin-bottom:6px; }
-#iv-choice .wrap label, #iv-multi .wrap label { border-radius:var(--r-full) !important; }
+#iv-choice .wrap label, #iv-multi .wrap label, #iv-multi-docs .wrap label { border-radius:var(--r-full) !important; }
+/* Choice controls (radio + the two checkbox groups) stay mounted-visible and are
+   driven by their CHOICES, never by Gradio's `visible` flag — toggling a
+   CheckboxGroup visible does not build its option DOM (it paints empty until the
+   next click). When a choice control has no options it is simply collapsed. */
+#iv-choice:not(:has(label)), #iv-multi:not(:has(label)), #iv-multi-docs:not(:has(label)) { display:none !important; }
 #iv-continue, #iv-continue button { background:var(--primary) !important; color:var(--on-primary) !important;
   box-shadow:0 2px 0 var(--primary-deep) !important; border:0 !important; font-weight:600 !important; }
 #iv-continue:hover, #iv-continue button:hover { background:var(--primary-deep) !important; }
@@ -195,42 +200,36 @@ def _active_control(session: SessionState, idx: int):
     return "text", None
 
 
+# Order of the five control updates everywhere: (radio, grounds, docs, country, text).
+# radio/grounds/docs are choice controls: ALWAYS mounted-visible, driven by choices
+# (empty = collapsed by CSS). country/text are toggled with `visible`.
+
 def control_updates(session: SessionState, idx: int):
-    """(radio, grounds, docs, country, text) updates: active control visible +
-    populated. The two checkbox groups always carry their full (language-correct)
-    choices so they are populated long before they are ever revealed."""
+    """Updates that make exactly the active control appear. Choice controls get
+    their choices (empty when inactive — never a `visible` toggle); country/text
+    toggle visibility."""
     which, choices = _active_control(session, idx)
     lang = session.language
     return (
-        gr.update(visible=which == "radio", choices=choices if which == "radio" else None, value=None),
-        gr.update(visible=which == "grounds", choices=option_labels(lang, _Q_GROUNDS), value=[]),
-        gr.update(visible=which == "docs", choices=option_labels(lang, _Q_DOCS), value=[]),
+        gr.update(choices=choices if which == "radio" else [], value=None),
+        gr.update(choices=option_labels(lang, _Q_GROUNDS) if which == "grounds" else [], value=[]),
+        gr.update(choices=option_labels(lang, _Q_DOCS) if which == "docs" else [], value=[]),
         gr.update(visible=which == "country", value=None),
         gr.update(visible=which == "text", value=""),
     )
 
 
-def control_frames(session: SessionState, idx: int):
-    """Two passes that defeat Gradio's choices-on-reveal lag for the radio:
-    pass 1 sets choices while hidden, pass 2 reveals. The checkbox groups keep
-    their choices populated throughout, so revealing them is lag-free."""
-    which, choices = _active_control(session, idx)
-    lang = session.language
-    hidden = (
-        gr.update(visible=False, choices=choices if which == "radio" else None, value=None),
-        gr.update(visible=False, choices=option_labels(lang, _Q_GROUNDS), value=[]),
-        gr.update(visible=False, choices=option_labels(lang, _Q_DOCS), value=[]),
-        gr.update(visible=False, value=None),
-        gr.update(visible=False, value=""),
+# Clears every control: choice controls emptied (collapse via CSS), country/text
+# hidden. Used while the conversation advances, before the active control is set
+# in the next round-trip.
+def _clear_controls():
+    return (
+        gr.update(choices=[], value=None),
+        gr.update(choices=[], value=[]),
+        gr.update(choices=[], value=[]),
+        gr.update(visible=False),
+        gr.update(visible=False),
     )
-    reveal = (
-        gr.update(visible=which == "radio"),
-        gr.update(visible=which == "grounds"),
-        gr.update(visible=which == "docs"),
-        gr.update(visible=which == "country"),
-        gr.update(visible=which == "text"),
-    )
-    return hidden, reveal
 
 
 def _store(session: SessionState, q: Question, radio_v, grounds_v, docs_v, country_v, text_v):
@@ -410,19 +409,15 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
             chat = gr.HTML(render_chat([]))
             with gr.Column(elem_id="iv-responder"):
                 lbl = gr.HTML('<div class="label-row">Your answer</div>')  # localised per turn
-                # Pre-mount with choices so they render immediately when shown
-                # (Gradio is laggy updating choices on a freshly-revealed control).
-                radio = gr.Radio(choices=["Yes", "No"], label="", show_label=False, visible=False, elem_id="iv-choice")
-                # One pre-mounted checkbox group per multi-select question, each
-                # with its own fixed choices — never swapped, so reveal is instant.
-                multi_grounds = gr.CheckboxGroup(
-                    choices=[t("English", oid) for oid in _Q_GROUNDS.options],
-                    label="", show_label=False, visible=False, elem_id="iv-multi",
-                )
-                multi_docs = gr.CheckboxGroup(
-                    choices=[t("English", oid) for oid in _Q_DOCS.options],
-                    label="", show_label=False, visible=False, elem_id="iv-multi-docs",
-                )
+                # Choice controls are mounted VISIBLE with empty choices and driven
+                # by their choices alone (CSS collapses them while empty). Toggling
+                # a CheckboxGroup's `visible` doesn't build its option DOM, so it
+                # would paint empty until the next click — this avoids that entirely.
+                radio = gr.Radio(choices=[], label="", show_label=False, visible=True, elem_id="iv-choice")
+                multi_grounds = gr.CheckboxGroup(choices=[], label="", show_label=False,
+                                                 visible=True, elem_id="iv-multi")
+                multi_docs = gr.CheckboxGroup(choices=[], label="", show_label=False,
+                                              visible=True, elem_id="iv-multi-docs")
                 country = gr.Dropdown(choices=country_choices(), label="", show_label=False, visible=False,
                                       allow_custom_value=True, filterable=True, elem_id="iv-country")
                 text = gr.Textbox(label="", show_label=False, lines=3, visible=False,
@@ -454,23 +449,20 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
         return (render_chat(session.messages), render_rail(session.state, session.language),
                 *control_updates(session, idx), session, idx)
 
-    _HIDE5 = (gr.update(visible=False), gr.update(visible=False), gr.update(visible=False),
-              gr.update(visible=False), gr.update(visible=False))
     _KEEP5 = (gr.update(), gr.update(), gr.update(), gr.update(), gr.update())
 
-    # The interview turn is split into TWO round-trips so a control reveal never
-    # rides in the same update as the chat re-render. When a CheckboxGroup's
-    # reveal competes with a large chat-HTML change in one frame, the browser
-    # drops its paint (it showed empty until an extra click). So the click
-    # handler only advances the conversation and HIDES the controls; a chained
-    # ``.then(reveal_controls)`` then reveals the right control on its own — a
-    # separate render cycle with nothing else changing, so it always paints.
+    # Each interview turn is two round-trips. Round 1 (the click handler) advances
+    # the conversation and CLEARS the controls. Round 2 (a chained
+    # ``.then(reveal_controls)``) sets the active control on its own — a separate
+    # render cycle with nothing else changing — so a CheckboxGroup's choices paint
+    # reliably (setting choices on an already-mounted-visible group always works;
+    # toggling its `visible` does not).
 
     async def _advance(o, loop):
-        """One frame: advance chat + rail, hide all controls (reveal comes next
-        round-trip). ``o`` is the tuple returned by ``_present`` (… , session, idx)."""
+        """One frame: advance chat + rail, clear all controls (the active control
+        is set in the next round-trip). ``o`` is ``_present``'s tuple (…, session, idx)."""
         session, idx = o[7], o[8]
-        yield (o[0], o[1], *_HIDE5, session, loop, idx, *_chrome_updates(session))
+        yield (o[0], o[1], *_clear_controls(), session, loop, idx, *_chrome_updates(session))
 
     async def start(session, loop, slot_idx=0):
         if session is None:
@@ -512,8 +504,8 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
             session.messages = list(session.messages) + [{"role": "user", "content": radio_v}]
             if radio_v == t(lang, "review_yes"):
                 advance_to(session, State.ASSESSMENT)  # triggers assessment via .then()
-                yield (render_chat(session.messages), render_rail(session.state),
-                       *_HIDE5, session, loop, idx, gr.update(), gr.update())
+                yield (render_chat(session.messages), render_rail(session.state, session.language),
+                       *_clear_controls(), session, loop, idx, gr.update(), gr.update())
                 return
             o = await _present(session, loop, CORRECT_INDEX)  # ask what to change
             async for frame in _advance(o, loop):
@@ -533,11 +525,11 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
     control_comps = [radio, multi_grounds, multi_docs, country, text]
 
     def reveal_controls(session, idx):
-        """Second round-trip: reveal the active control on its own (no chat change
-        competing for the paint). No-op once the interview has handed off to the
-        assessment (controls stay hidden)."""
+        """Second round-trip: set the active control on its own (no chat change
+        competing for the paint). Once the interview has handed off to the
+        assessment, clear everything (controls collapse)."""
         if session is None or session.state >= State.ASSESSMENT:
-            return _HIDE5
+            return _clear_controls()
         return control_updates(session, idx)
 
     continue_event = cont.click(

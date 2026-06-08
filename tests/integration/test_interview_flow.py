@@ -49,18 +49,35 @@ def test_question_text_templates_origin():
 def test_controls_are_deterministic_per_question():
     s = SessionState(); s.language = "English"
 
-    def vis(u):
-        return [x.get("visible") for x in u]
+    # control order: (radio, grounds, docs, country, text). Choice controls
+    # (radio/grounds/docs) are driven by non-empty choices, not a visible flag;
+    # country/text are driven by visible=True.
+    def active(u):
+        radio, grounds, docs, country, text = u
+        if radio.get("choices"):
+            return "radio"
+        if grounds.get("choices"):
+            return "grounds"
+        if docs.get("choices"):
+            return "docs"
+        if country.get("visible"):
+            return "country"
+        if text.get("visible"):
+            return "text"
+        return None
 
-    # control order: (radio, grounds, docs, country, text)
     by_field = {q.field: i for i, q in enumerate(QUESTIONS)}
-    assert vis(control_updates(s, by_field["current_country"])) == [False, False, False, True, False]  # country
-    assert vis(control_updates(s, by_field["immediate_danger"])) == [True, False, False, False, False]  # yes/no radio
-    assert vis(control_updates(s, by_field["persecution_types"])) == [False, True, False, False, False]  # grounds multi
-    assert vis(control_updates(s, by_field["documents_available"])) == [False, False, True, False, False]  # docs multi
-    assert vis(control_updates(s, by_field["free_text_history"])) == [False, False, False, False, True]  # text
-    # review step shows the confirm radio
-    assert vis(control_updates(s, REVIEW_INDEX)) == [True, False, False, False, False]
+    assert active(control_updates(s, by_field["current_country"])) == "country"
+    assert active(control_updates(s, by_field["immediate_danger"])) == "radio"  # yes/no
+    assert active(control_updates(s, by_field["persecution_types"])) == "grounds"
+    assert active(control_updates(s, by_field["documents_available"])) == "docs"
+    assert active(control_updates(s, by_field["free_text_history"])) == "text"
+    assert active(control_updates(s, REVIEW_INDEX)) == "radio"  # confirm
+
+    # The inactive choice controls are emptied so CSS collapses them (never a
+    # stray visible CheckboxGroup leaking through).
+    u = control_updates(s, by_field["documents_available"])
+    assert u[1]["choices"] == [] and u[0]["choices"] == []  # grounds + radio cleared
 
 
 def test_option_labels_localised():

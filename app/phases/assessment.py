@@ -368,9 +368,13 @@ async def stream_assessment(session: SessionState, loop):
     origin = (session.interview.origin_country or "").strip().lower()
 
     def _collect(names: list[str], into: list[dict], seen: set[str]) -> None:
+        # Protection-case destinations only: a country must actually be a party to
+        # the Refugee Convention. Non-signatories (e.g. Pakistan) have no asylum
+        # system, so recommending them — or showing a UNHCR/RSD roadmap for them —
+        # would be misleading.
         for name in names:
             rec = lookup_country(name)
-            if rec.get("error"):
+            if rec.get("error") or not rec.get("isSignatory"):
                 continue
             cname = (rec.get("country") or "").strip()
             if not cname or cname.lower() == origin or cname.lower() in seen:

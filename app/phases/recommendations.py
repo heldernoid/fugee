@@ -234,16 +234,23 @@ def roadmap_html(rec: dict | None, economic: bool = False) -> str:
         head_title = "Your work-route roadmap"
     else:
         office = rec.get("unhcrOffice")
-        unhcr_contact = f"UNHCR {office}" if office else "UNHCR office"
         legal = _contact(rec)
         months = rec.get("processingTimeMonths")
         total_time = f"~{months} months total" if months else "varies"
         head_title = "Your roadmap"
+        # Where you register depends on the country: with UNHCR where it runs
+        # registration, otherwise with the national asylum authority.
+        if rec.get("unhcrPresence"):
+            reg_title = "Register with UNHCR"
+            reg_contact = f"UNHCR {office}" if office else "UNHCR office"
+        else:
+            reg_title = "Register your asylum claim"
+            reg_contact = "National asylum authority"
         steps = [
-            ("Register with UNHCR",
+            (reg_title,
              "Get a registration appointment and an asylum-seeker certificate, which "
              "protects you from being returned.",
-             unhcr_contact, "1–4 weeks for appointment"),
+             reg_contact, "1–4 weeks for appointment"),
             ("File your asylum claim",
              "Submit your personal statement and supporting evidence. Fugee has "
              "already drafted these for you.",
