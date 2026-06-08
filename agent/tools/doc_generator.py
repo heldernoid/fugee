@@ -19,7 +19,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from docx import Document
-from docx.shared import Pt, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+from docx.shared import Inches, Mm, Pt, RGBColor
 from weasyprint import HTML
 
 from agent.drafting import fallback_statement
@@ -29,9 +32,19 @@ logger = logging.getLogger("refuge.doc_generator")
 
 TEMPLATES = Path(__file__).resolve().parent / "templates"
 _HEAD = (TEMPLATES / "_head.html").read_text(encoding="utf-8")
+LOGO_PNG = TEMPLATES / "logo.png"
 _PLACEHOLDER = re.compile(r"(\[[^\]]+\])")
+# Palette mirrors templates/_head.html so the .docx matches the .pdf exactly.
 _AMBER = RGBColor(0xC2, 0x63, 0x29)
 _TEAL = RGBColor(0x0A, 0x50, 0x42)
+_INK = RGBColor(0x1A, 0x1A, 0x1A)
+_MUTED = RGBColor(0x6B, 0x72, 0x80)
+_LINE = "E7E2D8"      # light divider (hex, no #)
+_TEAL_HEX = "0E6A58"
+# Fonts: same families as the PDF. Word uses the named font if installed and
+# substitutes otherwise — the .docx still reads as the branded document.
+_SERIF = "Fraunces"   # display / headings
+_SANS = "Inter"       # body / UI
 
 
 @dataclass
@@ -65,17 +78,132 @@ def _html_with_placeholders(text: str) -> str:
     return "\n".join(out)
 
 
-def _docx_add_rich(doc: Document, text: str):
-    """Add paragraphs, bolding [placeholders] so they're easy to find and edit."""
+# -- DOCX styling layer (mirrors the PDF template in templates/_head.html) -----
+
+def _font(run, name: str, size: float | None = None, color: RGBColor | None = None,
+          bold: bool = False, italic: bool = False):
+    run.font.name = name
+    # Make the font apply to all script ranges, not just Latin.
+    rpr = run._element.get_or_add_rPr()
+    rfonts = rpr.get_or_add_rFonts()
+    for attr in ("w:ascii", "w:hAnsi", "w:cs"):
+        rfonts.set(qn(attr), name)
+    if size is not None:
+        run.font.size = Pt(size)
+    if color is not None:
+        run.font.color.rgb = color
+    run.bold = bold
+    run.italic = italic
+    return run
+
+
+def _border(paragraph, edge: str, color: str, size: int = 8, space: int = 6):
+    """Add a single border on one edge of a paragraph (used for rules/dividers)."""
+    pPr = paragraph._p.get_or_add_pPr()
+    pbdr = pPr.find(qn("w:pBdr"))
+    if pbdr is None:
+        pbdr = OxmlElement("w:pBdr")
+        pPr.append(pbdr)
+    el = OxmlElement(f"w:{edge}")
+    el.set(qn("w:val"), "single")
+    el.set(qn("w:sz"), str(size))
+    el.set(qn("w:space"), str(space))
+    el.set(qn("w:color"), color)
+    pbdr.append(el)
+
+
+def _page_number(paragraph):
+    run = paragraph.add_run()
+    for kind, text in (("begin", None), (None, "PAGE"), ("end", None)):
+        if kind:
+            fld = OxmlElement("w:fldChar")
+            fld.set(qn("w:fldCharType"), kind)
+            run._r.append(fld)
+        else:
+            instr = OxmlElement("w:instrText")
+            instr.set(qn("xml:space"), "preserve")
+            instr.text = f" {text} "
+            run._r.append(instr)
+    _font(run, _SANS, 8, _MUTED)
+
+
+def _docx_base(title: str, subtitle: str) -> Document:
+    """A new branded document: A4-ish margins, Inter body, the Fugee masthead
+    (logo + wordmark + rule), an H1 title, a muted subtitle, and a page footer —
+    the same anatomy as the PDF in templates/_head.html."""
+    doc = Document()
+    section = doc.sections[0]
+    section.top_margin, section.bottom_margin = Mm(22), Mm(18)
+    section.left_margin, section.right_margin = Mm(20), Mm(20)
+
+    normal = doc.styles["Normal"]
+    normal.font.name = _SANS
+    normal.font.size = Pt(11)
+    normal.font.color.rgb = _INK
+    rfonts = normal.element.get_or_add_rPr().get_or_add_rFonts()
+    for attr in ("w:ascii", "w:hAnsi", "w:cs"):
+        rfonts.set(qn(attr), _SANS)
+
+    # Masthead: logo + wordmark on the left, tagline pushed right, teal rule under.
+    head = doc.add_paragraph()
+    head.paragraph_format.tab_stops.add_tab_stop(Inches(6.3), WD_TAB_ALIGNMENT.RIGHT)
+    if LOGO_PNG.exists():
+        head.add_run().add_picture(str(LOGO_PNG), height=Inches(0.26))
+    _font(head.add_run("  Fugee"), _SERIF, 17, _TEAL, bold=True)
+    _font(head.add_run("\tSAFE GUIDANCE FOR PEOPLE ON THE MOVE"), _SANS, 8, _MUTED)
+    _border(head, "bottom", _TEAL_HEX, size=18, space=8)
+    head.paragraph_format.space_after = Pt(16)
+
+    # Title + subtitle.
+    h1 = doc.add_paragraph()
+    _font(h1.add_run(title), _SERIF, 22, _TEAL, bold=True)
+    h1.paragraph_format.space_after = Pt(2)
+    sub = doc.add_paragraph()
+    _font(sub.add_run(subtitle), _SANS, 10, _MUTED, italic=True)
+    sub.paragraph_format.space_after = Pt(14)
+
+    # Footer: "Prepared with Fugee …  Page N".
+    fp = section.footer.paragraphs[0]
+    fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    _font(fp.add_run("Prepared with Fugee · Safe guidance for people on the move    "), _SANS, 8, _MUTED)
+    _page_number(fp)
+    return doc
+
+
+def _docx_h2(doc: Document, text: str):
+    p = doc.add_paragraph()
+    _font(p.add_run(text), _SERIF, 13.5, _TEAL, bold=True)
+    p.paragraph_format.space_before = Pt(14)
+    p.paragraph_format.space_after = Pt(4)
+    _border(p, "bottom", _LINE, size=6, space=3)
+    return p
+
+
+def _docx_body(doc: Document, text: str):
+    """Paragraphs with [placeholders] highlighted in amber bold (as in the PDF)."""
     for para in _paras(text):
         p = doc.add_paragraph()
+        p.paragraph_format.space_after = Pt(8)
         for part in _PLACEHOLDER.split(para):
             if not part:
                 continue
             run = p.add_run(part)
+            _font(run, _SANS, 11, _INK)
             if _PLACEHOLDER.fullmatch(part):
-                run.bold = True
-                run.font.color.rgb = _AMBER
+                _font(run, _SANS, 11, _AMBER, bold=True)
+
+
+def _docx_bullets(doc: Document, items: list[str]):
+    for it in items:
+        p = doc.add_paragraph(style="List Bullet")
+        _font(p.add_run(str(it)), _SANS, 11, _INK)
+
+
+def _docx_note(doc: Document, text: str):
+    p = doc.add_paragraph()
+    p.paragraph_format.space_before = Pt(16)
+    _border(p, "top", _LINE, size=6, space=8)
+    _font(p.add_run(text), _SANS, 9.5, _MUTED)
 
 
 # Branded masthead (the Fugee mark + wordmark) shown atop every PDF.
@@ -91,28 +219,6 @@ _BRAND = (
 )
 
 
-def _new_docx(title: str, subtitle: str) -> Document:
-    doc = Document()
-    # Branded wordmark + rule (a logo image would need a raster asset; the
-    # wordmark keeps the package self-contained).
-    brand = doc.add_paragraph()
-    run = brand.add_run("Fugee")
-    run.bold = True
-    run.font.size = Pt(20)
-    run.font.color.rgb = _TEAL
-    tag = brand.add_run("   Safe guidance for people on the move")
-    tag.font.size = Pt(9)
-    tag.font.color.rgb = RGBColor(0x6B, 0x72, 0x80)
-    h = doc.add_heading(title, level=0)
-    try:
-        h.runs[0].font.color.rgb = _TEAL
-    except Exception:
-        pass
-    sub = doc.add_paragraph(subtitle)
-    sub.runs[0].italic = True
-    sub.runs[0].font.size = Pt(9)
-    sub.runs[0].font.color.rgb = RGBColor(0x6B, 0x72, 0x80)
-    return doc
 
 
 def _pdf_from_html(body_html: str, path: Path):
@@ -175,8 +281,10 @@ def generate(session, statement: str | None = None, out_dir: Path | None = None)
     # 1. Personal statement (LLM-drafted) — PDF + DOCX
     ps_pdf, ps_docx = out_dir / "personal_statement.pdf", out_dir / "personal_statement.docx"
     _pdf_from_html(_statement_body_html(stmt), ps_pdf)
-    d = _new_docx("Personal Statement", "In support of an application for refugee status · Prepared with Fugee")
-    _docx_add_rich(d, stmt)
+    d = _docx_base("Personal Statement", "In support of an application for refugee status · Prepared with Fugee")
+    _docx_body(d, stmt)
+    _docx_note(d, "Fields in amber are placeholders for you to complete. You can edit "
+                  "any part of this statement in this Word (.docx) version.")
     d.save(str(ps_docx))
     docs.append(GeneratedDoc("personal_statement", "Personal statement (editable)",
                              "Word + PDF · drafted for you, with placeholders to complete", ps_pdf, ps_docx))
@@ -190,10 +298,13 @@ def generate(session, statement: str | None = None, out_dir: Path | None = None)
                        for i, s in enumerate(steps, 1)))
     ap_pdf, ap_docx = out_dir / "action_plan.pdf", out_dir / "action_plan.docx"
     _pdf_from_html(ap_html, ap_pdf)
-    d = _new_docx(f"Action Plan — {country}", "Step-by-step roadmap · Prepared with Fugee")
-    d.add_paragraph(intro)
+    d = _docx_base(f"Action Plan — {country}", "Step-by-step roadmap · Prepared with Fugee")
+    _docx_body(d, intro)
     for i, s in enumerate(steps, 1):
-        d.add_paragraph(f"Step {i}. {s}", style="List Number" if "List Number" in [s.name for s in d.styles] else None)
+        p = d.add_paragraph()
+        p.paragraph_format.space_after = Pt(6)
+        _font(p.add_run(f"Step {i}.  "), _SANS, 11, _TEAL, bold=True)
+        _font(p.add_run(str(s)), _SANS, 11, _INK)
     d.save(str(ap_docx))
     docs.append(GeneratedDoc("action_plan", "Action plan", "Word + PDF · roadmap with contacts", ap_pdf, ap_docx))
 
@@ -208,10 +319,18 @@ def generate(session, statement: str | None = None, out_dir: Path | None = None)
                 or "<p>Ask the UNHCR office for registered legal-aid partners.</p>"))
     ec_pdf, ec_docx = out_dir / "emergency_contacts.pdf", out_dir / "emergency_contacts.docx"
     _pdf_from_html(ec_html, ec_pdf)
-    d = _new_docx("Emergency Contacts", "UNHCR offices & legal aid · Prepared with Fugee")
-    d.add_paragraph(f"{country} — UNHCR office: {office}")
-    for n, u in orgs:
-        d.add_paragraph(f"{n} — {u}")
+    d = _docx_base("Emergency Contacts", "UNHCR offices & legal aid · Prepared with Fugee")
+    _docx_h2(d, country)
+    _docx_body(d, f"UNHCR office: {office}")
+    _docx_h2(d, "Legal aid & support")
+    if orgs:
+        for n, u in orgs:
+            p = d.add_paragraph()
+            p.paragraph_format.space_after = Pt(6)
+            _font(p.add_run(n + "\n"), _SANS, 11, _TEAL, bold=True)
+            _font(p.add_run(u), _SANS, 10, _MUTED)
+    else:
+        _docx_body(d, "Ask the UNHCR office for registered legal-aid partners.")
     d.save(str(ec_docx))
     docs.append(GeneratedDoc("emergency_contacts", "Emergency contacts", "Word + PDF · UNHCR & legal aid", ec_pdf, ec_docx))
 
@@ -230,14 +349,17 @@ def generate(session, statement: str | None = None, out_dir: Path | None = None)
                f"Seeking protection in: {html.escape(country)} · Grounds: {html.escape(grounds)}</p>")
     rc_pdf, rc_docx = out_dir / "rights_summary_card.pdf", out_dir / "rights_summary_card.docx"
     _pdf_from_html(rc_html, rc_pdf)
-    d = _new_docx("Your Rights — Summary Card", "Key protections · Prepared with Fugee")
-    d.add_paragraph("Non-refoulement: you cannot be forced back to a country where your life or freedom "
-                    "would be at serious risk (1951 Refugee Convention).")
-    for r in ["The right to seek asylum and a fair hearing.",
-              "The right to an interpreter and free legal assistance.",
-              "The right not to be detained arbitrarily.",
-              "The right to shelter, food, and emergency healthcare."]:
-        d.add_paragraph(r, style=None)
+    d = _docx_base("Your Rights — Summary Card", "Key protections · Prepared with Fugee")
+    _docx_h2(d, "Non-refoulement")
+    _docx_body(d, "You cannot be forced back to a country where your life or freedom "
+                  "would be at serious risk (1951 Refugee Convention).")
+    _docx_h2(d, "While your claim is decided")
+    _docx_bullets(d, ["The right to seek asylum and a fair hearing.",
+                      "The right to an interpreter and free legal assistance.",
+                      "The right not to be detained arbitrarily.",
+                      "The right to shelter, food, and emergency healthcare."])
+    _docx_body(d, f"Origin: {session.interview.origin_country or '[origin]'} · "
+                  f"Seeking protection in: {country} · Grounds: {grounds}")
     d.save(str(rc_docx))
     docs.append(GeneratedDoc("rights_summary_card", "Your rights — summary card", "Word + PDF · key protections", rc_pdf, rc_docx))
 
