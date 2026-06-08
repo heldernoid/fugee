@@ -46,7 +46,7 @@ AGENT_AVATAR = (
 INTERVIEW_CSS = """
 #iv-screen { background: var(--surface); border: 1px solid var(--line);
   border-radius: var(--r-lg); box-shadow: var(--shadow-md); overflow: hidden;
-  max-width: var(--maxw); margin: 0 auto; }
+  max-width: 1180px; width: 100%; margin: 0 auto; }
 .iv-rail { display:flex; align-items:center; gap:6px; padding:18px clamp(18px,4vw,28px);
   background:var(--surface-2); border-bottom:1px solid var(--line); flex-wrap:wrap; }
 .iv-pill { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-muted); font-weight:500; }

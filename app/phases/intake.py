@@ -38,7 +38,7 @@ _NATIVE_TO_ENGLISH = {native: english for native, english in LANGUAGES}
 INTAKE_CSS = """
 #intake-screen { background: var(--surface); border: 1px solid var(--line);
   border-radius: var(--r-lg); box-shadow: var(--shadow-md); overflow: hidden;
-  max-width: 1000px; width: 100%; margin: 0 auto; }
+  max-width: 1180px; width: 100%; margin: 0 auto; }
 .intake-wrap { position:relative; padding:clamp(40px,7vw,84px) clamp(20px,5vw,72px);
   text-align:center; overflow:hidden;
   background:linear-gradient(180deg,#FCFBF7 0%,#F4F1E9 100%); }
