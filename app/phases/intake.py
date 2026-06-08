@@ -110,7 +110,7 @@ _HEADER_HTML = f"""
 _TRUST_HTML = """
 <div style="text-align:center;"><span class="intake-trust">
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
-  This conversation is private. Nothing is stored without your consent.
+  This conversation is private.
 </span></div>
 """
 
