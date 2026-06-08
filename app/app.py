@@ -112,8 +112,6 @@ SITE_BAR_HTML = f"""
   {_LOGO_SVG}
   <span class="name">Fugee</span>
   <span class="tag">Safe guidance for people on the move</span>
-  <nav class="nav"><span>Intake</span><span>Interview</span><span>Assessment</span>
-    <span>Recommendations</span><span>Documents</span></nav>
 </div></header>
 """
 
