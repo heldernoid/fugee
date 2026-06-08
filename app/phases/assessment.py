@@ -21,6 +21,7 @@ from agent.tools.asylum_stats import asylum_stats_tool
 from agent.tools.country_lookup import country_lookup_tool, lookup_country
 from agent.tools.guideline_search import guideline_search_tool
 from app.assessment_parse import parse_assessment
+from app.mdlite import md_to_html
 from app.phases.interview import advance_to
 from app.prompt_loader import compose
 from app.state.session import SessionState, State
@@ -68,10 +69,15 @@ ASSESSMENT_CSS = """
   background:linear-gradient(90deg,var(--primary),var(--secondary)); transition:width .6s cubic-bezier(.4,0,.1,1); }
 .assess .tool-chip { display:inline-flex; align-items:center; gap:7px; margin-top:10px; font-size:12.5px;
   font-weight:600; color:var(--primary-deep); background:var(--primary-tint); padding:5px 11px; border-radius:var(--r-full); }
-.reason-doc { font-size:14.5px; line-height:1.75; color:var(--text-secondary); }
-.reason-doc .ln { display:block; margin-bottom:10px; padding-left:18px; position:relative; }
-.reason-doc .ln::before { content:""; position:absolute; left:0; top:9px; width:7px; height:7px; border-radius:50%; background:var(--primary); opacity:.5; }
-.reason-doc .ln strong { color:var(--text); font-weight:600; }
+.reason-doc { font-size:14.5px; line-height:1.7; color:var(--text-secondary); }
+.reason-doc p { margin:0 0 12px; }
+.reason-doc h4 { font-family:var(--font-ui); font-size:14px; font-weight:700; color:var(--text);
+  margin:18px 0 8px; letter-spacing:.01em; }
+.reason-doc strong { color:var(--text); font-weight:600; }
+.reason-doc em { font-style:italic; }
+.reason-doc ul, .reason-doc ol { margin:0 0 12px; padding-left:20px; }
+.reason-doc li { margin-bottom:6px; }
+.reason-doc code { background:var(--primary-tint); padding:1px 5px; border-radius:4px; font-size:13px; }
 #assess-proceed-row { padding:18px clamp(18px,4vw,28px); border-top:1px solid var(--line); justify-content:flex-end; }
 #assess-proceed, #assess-proceed button { background:var(--accent) !important; color:var(--on-accent) !important;
   box-shadow:0 2px 0 var(--accent-deep) !important; border:0 !important; font-weight:600 !important;
@@ -113,10 +119,8 @@ def render_facts(session: SessionState) -> str:
 def render_reason(text: str) -> str:
     visible, _ = parse_assessment(text)
     if not visible.strip():
-        visible = "Beginning your assessment…"
-    paras = [p.strip() for p in visible.split("\n") if p.strip()]
-    lns = "".join(f'<span class="ln">{html.escape(p)}</span>' for p in paras)
-    return f'<div class="reason-doc">{lns}</div>'
+        return '<div class="reason-doc"><p>Beginning your assessment…</p></div>'
+    return f'<div class="reason-doc">{md_to_html(visible)}</div>'
 
 
 def render_progress(pct: int, status: str = "") -> str:

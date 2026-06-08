@@ -133,7 +133,7 @@ def card_body_html(rec: dict) -> str:
     )
     docs = rec.get("requiredDocuments") or []
     prep_items = "".join(f"<li>{html.escape(str(d))}</li>" for d in docs) or \
-        "<li>Refuge will help you gather what you need.</li>"
+        "<li>Fugee will help you gather what you need.</li>"
     return (
         '<div class="ccard__top">'
         f'<span class="ccard__flag">{flag}</span>'
@@ -170,7 +170,7 @@ def roadmap_html(rec: dict | None) -> str:
          "protects you from being returned.",
          unhcr_contact, "1–4 weeks for appointment"),
         ("File your asylum claim",
-         "Submit your personal statement and supporting evidence. Refuge has "
+         "Submit your personal statement and supporting evidence. Fugee has "
          "already drafted these for you.",
          "Asylum authority / RSD unit", "Same week as registration"),
         ("Refugee status interview (RSD)",

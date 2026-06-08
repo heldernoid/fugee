@@ -17,6 +17,7 @@ import gradio as gr
 
 from agent.events import TextDeltaEvent
 from agent.loop import create_loop
+from app import mdlite
 from app.countries import country_choices, country_name
 from app.prompt_loader import load_prompt
 from app.interview_script import (
@@ -102,13 +103,8 @@ def render_rail(state: State) -> str:
     return f'<div class="iv-rail" aria-label="Interview progress">{"".join(pills)}</div>'
 
 
-def _bold(escaped: str) -> str:
-    """Render **markdown bold** (used for review summary labels)."""
-    return re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", escaped)
-
-
 def _bubble(role: str, text: str, current: bool = False) -> str:
-    safe = _bold(html.escape(text)).replace("\n", "<br>")
+    safe = mdlite.inline(text).replace("\n", "<br>")
     if role == "user":
         return ('<div class="iv-msg iv-msg--user"><div class="iv-msg__av"><span>You</span></div>'
                 f'<div class="iv-msg__bubble">{safe}</div></div>')

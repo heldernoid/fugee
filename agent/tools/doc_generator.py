@@ -78,8 +78,31 @@ def _docx_add_rich(doc: Document, text: str):
                 run.font.color.rgb = _AMBER
 
 
+# Branded masthead (the Fugee mark + wordmark) shown atop every PDF.
+_LOGO_SVG = (
+    '<svg class="logo" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">'
+    '<circle cx="16" cy="16" r="15.5" fill="#0E6A58"/>'
+    '<path d="M16 7l7 6.5V25h-4.6v-6.2h-4.8V25H9V13.5L16 7z" fill="#fff"/>'
+    '<circle cx="16" cy="13.6" r="1.7" fill="#E07B39"/></svg>'
+)
+_BRAND = (
+    f'<div class="brand">{_LOGO_SVG}<span class="name">Fugee</span>'
+    '<span class="tag">Safe guidance for people on the move</span></div>'
+)
+
+
 def _new_docx(title: str, subtitle: str) -> Document:
     doc = Document()
+    # Branded wordmark + rule (a logo image would need a raster asset; the
+    # wordmark keeps the package self-contained).
+    brand = doc.add_paragraph()
+    run = brand.add_run("Fugee")
+    run.bold = True
+    run.font.size = Pt(20)
+    run.font.color.rgb = _TEAL
+    tag = brand.add_run("   Safe guidance for people on the move")
+    tag.font.size = Pt(9)
+    tag.font.color.rgb = RGBColor(0x6B, 0x72, 0x80)
     h = doc.add_heading(title, level=0)
     try:
         h.runs[0].font.color.rgb = _TEAL
@@ -93,7 +116,7 @@ def _new_docx(title: str, subtitle: str) -> Document:
 
 
 def _pdf_from_html(body_html: str, path: Path):
-    HTML(string=f"<!DOCTYPE html><html><head>{_HEAD}</head><body>{body_html}</body></html>").write_pdf(str(path))
+    HTML(string=f"<!DOCTYPE html><html><head>{_HEAD}</head><body>{_BRAND}{body_html}</body></html>").write_pdf(str(path))
 
 
 # -- per-document content ---------------------------------------------------
@@ -101,7 +124,7 @@ def _pdf_from_html(body_html: str, path: Path):
 def _statement_body_html(text: str) -> str:
     return (
         "<h1>Personal Statement</h1>"
-        '<p class="sub">In support of an application for refugee status · Prepared with Refuge</p>'
+        '<p class="sub">In support of an application for refugee status · Prepared with Fugee</p>'
         f"{_html_with_placeholders(text)}"
         '<p class="note">Fields in amber are placeholders for you to complete. You can edit any part '
         "of this statement in the Word (.docx) version.</p>"
@@ -150,7 +173,7 @@ def generate(session, statement: str | None = None, out_dir: Path | None = None)
     # 1. Personal statement (LLM-drafted) — PDF + DOCX
     ps_pdf, ps_docx = out_dir / "personal_statement.pdf", out_dir / "personal_statement.docx"
     _pdf_from_html(_statement_body_html(stmt), ps_pdf)
-    d = _new_docx("Personal Statement", "In support of an application for refugee status · Prepared with Refuge")
+    d = _new_docx("Personal Statement", "In support of an application for refugee status · Prepared with Fugee")
     _docx_add_rich(d, stmt)
     d.save(str(ps_docx))
     docs.append(GeneratedDoc("personal_statement", "Personal statement (editable)",
@@ -159,13 +182,13 @@ def generate(session, statement: str | None = None, out_dir: Path | None = None)
     # 2. Action plan
     country, intro, steps = _action_plan_blocks(session, rec)
     ap_html = (f"<h1>Action Plan — {html.escape(country)}</h1>"
-               '<p class="sub">Step-by-step roadmap · Prepared with Refuge</p>'
+               '<p class="sub">Step-by-step roadmap · Prepared with Fugee</p>'
                f"<p>{html.escape(intro)}</p>" +
                "".join(f'<p class="step"><b>Step {i}.</b> {html.escape(str(s))}</p>'
                        for i, s in enumerate(steps, 1)))
     ap_pdf, ap_docx = out_dir / "action_plan.pdf", out_dir / "action_plan.docx"
     _pdf_from_html(ap_html, ap_pdf)
-    d = _new_docx(f"Action Plan — {country}", "Step-by-step roadmap · Prepared with Refuge")
+    d = _new_docx(f"Action Plan — {country}", "Step-by-step roadmap · Prepared with Fugee")
     d.add_paragraph(intro)
     for i, s in enumerate(steps, 1):
         d.add_paragraph(f"Step {i}. {s}", style="List Number" if "List Number" in [s.name for s in d.styles] else None)
@@ -176,14 +199,14 @@ def generate(session, statement: str | None = None, out_dir: Path | None = None)
     office = (rec or {}).get("unhcrOffice") or "Nearest UNHCR office"
     orgs = _orgs(rec)
     ec_html = ("<h1>Emergency Contacts</h1>"
-               '<p class="sub">UNHCR offices &amp; legal aid · Prepared with Refuge</p>'
+               '<p class="sub">UNHCR offices &amp; legal aid · Prepared with Fugee</p>'
                f"<h2>{html.escape(country)}</h2><p>UNHCR office: {html.escape(office)}</p>"
                "<h2>Legal aid &amp; support</h2>" +
                ("".join(f'<div class="org"><b>{html.escape(n)}</b><span>{html.escape(u)}</span></div>' for n, u in orgs)
                 or "<p>Ask the UNHCR office for registered legal-aid partners.</p>"))
     ec_pdf, ec_docx = out_dir / "emergency_contacts.pdf", out_dir / "emergency_contacts.docx"
     _pdf_from_html(ec_html, ec_pdf)
-    d = _new_docx("Emergency Contacts", "UNHCR offices & legal aid · Prepared with Refuge")
+    d = _new_docx("Emergency Contacts", "UNHCR offices & legal aid · Prepared with Fugee")
     d.add_paragraph(f"{country} — UNHCR office: {office}")
     for n, u in orgs:
         d.add_paragraph(f"{n} — {u}")
@@ -193,7 +216,7 @@ def generate(session, statement: str | None = None, out_dir: Path | None = None)
     # 4. Rights summary card
     grounds = ", ".join(session.assessment.convention_grounds) if session.assessment.convention_grounds else "to be confirmed"
     rc_html = ("<h1>Your Rights — Summary Card</h1>"
-               '<p class="sub">Key protections · Prepared with Refuge</p>'
+               '<p class="sub">Key protections · Prepared with Fugee</p>'
                "<h2>Non-refoulement</h2><p>You cannot be forced back to a country where your life or freedom "
                "would be at serious risk (1951 Refugee Convention).</p>"
                "<h2>While your claim is decided</h2><ul>"
@@ -205,7 +228,7 @@ def generate(session, statement: str | None = None, out_dir: Path | None = None)
                f"Seeking protection in: {html.escape(country)} · Grounds: {html.escape(grounds)}</p>")
     rc_pdf, rc_docx = out_dir / "rights_summary_card.pdf", out_dir / "rights_summary_card.docx"
     _pdf_from_html(rc_html, rc_pdf)
-    d = _new_docx("Your Rights — Summary Card", "Key protections · Prepared with Refuge")
+    d = _new_docx("Your Rights — Summary Card", "Key protections · Prepared with Fugee")
     d.add_paragraph("Non-refoulement: you cannot be forced back to a country where your life or freedom "
                     "would be at serious risk (1951 Refugee Convention).")
     for r in ["The right to seek asylum and a fair hearing.",
@@ -241,7 +264,7 @@ def preview_statement_html(session, statement: str | None = None) -> str:
     """Head-less personal-statement snippet for the on-screen preview."""
     stmt = statement or fallback_statement(session)
     return ('<article class="doc"><h4>Personal Statement</h4>'
-            '<p class="doc__sub">In support of an application for refugee status · Prepared with Refuge</p>'
+            '<p class="doc__sub">In support of an application for refugee status · Prepared with Fugee</p>'
             f"{_html_with_placeholders(stmt)}</article>")
 
 

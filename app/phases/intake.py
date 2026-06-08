@@ -1,6 +1,6 @@
 """app/phases/intake.py — Phase 1 intake + language selection (T030-T032).
 
-Matches mockup.html #phase-1: a calm welcome with the Refuge wordmark, a
+Matches mockup.html #phase-1: a calm welcome with the Fugee wordmark, a
 topographic backdrop, a grid of language pills each in its own script, an amber
 "Begin in <language>" primary action, and a persistent privacy trust note.
 
@@ -100,7 +100,7 @@ _HEADER_HTML = f"""
     <div class="intake-logo" aria-hidden="true">
       <svg width="64" height="64" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="15.5" fill="#0E6A58"/><circle cx="16" cy="16" r="15.5" stroke="#0A5042"/><path d="M16 7l7 6.5V25h-4.6v-6.2h-4.8V25H9V13.5L16 7z" fill="#fff"/><circle cx="16" cy="13.6" r="1.7" fill="#E07B39"/></svg>
     </div>
-    <h1 class="intake-h1">Refuge</h1>
+    <h1 class="intake-h1">Fugee</h1>
     <p class="intake-tagline">Safe guidance for people on the move</p>
     <p class="intake-lbl">Choose your language</p>
   </div>

@@ -19,7 +19,7 @@ from app.state.session import SessionState
 
 # Evidence checklist: (label, sublabel, document_available key or None).
 CHECKLIST = [
-    ("Personal statement", "Drafted by Refuge · ready", "_always"),
+    ("Personal statement", "Drafted by Fugee · ready", "_always"),
     ("Identity document or sworn statement", "Passport, national ID, or a sworn statement", "passport"),
     ("Proof of journey / entry", "Tickets, stamps, or a written account", "travel"),
     ("Photos or messages showing the threat", "Optional, but strengthens your claim", "evidence"),

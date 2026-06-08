@@ -1,30 +1,48 @@
 <meta charset="utf-8" />
 <style>
-  @page { size: A4; margin: 22mm 20mm; }
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap');
+  @page {
+    size: A4; margin: 24mm 20mm 20mm;
+    @bottom-center {
+      content: "Prepared with Fugee · Safe guidance for people on the move";
+      font-family: "Inter", sans-serif; font-size: 8pt; color: #9aa0ab;
+    }
+    @bottom-right { content: "Page " counter(page) " of " counter(pages);
+      font-family: "Inter", sans-serif; font-size: 8pt; color: #9aa0ab; }
+  }
   :root {
-    --primary: #0E6A58; --primary-deep: #0A5042; --accent-tint: #FBEDE1;
-    --text: #1A1A1A; --muted: #6B7280; --line: #E7E2D8;
+    --primary: #0E6A58; --primary-deep: #0A5042; --accent: #E07B39; --accent-tint: #FBEDE1;
+    --text: #1A1A1A; --muted: #6B7280; --line: #E7E2D8; --tint: #E5EFEA;
   }
   * { box-sizing: border-box; }
   body { font-family: "Inter", "Helvetica Neue", Arial, sans-serif; color: var(--text);
-    font-size: 12pt; line-height: 1.6; }
+    font-size: 11.5pt; line-height: 1.65; }
+
+  /* Branded masthead */
+  .brand { display: flex; align-items: center; gap: 10px; padding-bottom: 12px;
+    border-bottom: 2px solid var(--primary); margin-bottom: 22px; }
+  .brand .logo { width: 30px; height: 30px; flex: 0 0 auto; }
+  .brand .name { font-family: "Fraunces", Georgia, serif; font-weight: 700; font-size: 19pt;
+    color: var(--primary-deep); letter-spacing: -.01em; }
+  .brand .tag { margin-left: auto; font-size: 8.5pt; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+
   h1, h2, h3, h4 { font-family: "Fraunces", Georgia, "Times New Roman", serif; color: var(--primary-deep);
     margin: 0 0 4px; line-height: 1.2; }
-  h1 { font-size: 22pt; }
-  h2 { font-size: 15pt; margin-top: 18px; }
-  .sub { color: var(--muted); font-size: 10pt; margin: 0 0 16px; letter-spacing: .02em; }
+  h1 { font-size: 23pt; }
+  h2 { font-size: 14pt; margin-top: 20px; padding-bottom: 3px; border-bottom: 1px solid var(--line); }
+  .sub { color: var(--muted); font-size: 10pt; margin: 0 0 18px; letter-spacing: .02em; }
   p { margin: 0 0 11px; }
   .fill { background: var(--accent-tint); color: #7a431a; padding: 0 4px; border-radius: 3px; font-weight: 600; }
-  .blank { display: inline-block; min-width: 120px; border-bottom: 1px solid #999; }
-  .divider { height: 1px; background: var(--line); margin: 14px 0; }
-  .note { color: var(--muted); font-size: 9.5pt; margin-top: 20px; border-top: 1px solid var(--line); padding-top: 8px; }
+  .blank { display: inline-block; min-width: 130px; border-bottom: 1px solid #999; }
+  .divider { height: 1px; background: var(--line); margin: 16px 0; }
+  .note { color: var(--muted); font-size: 9.5pt; margin-top: 22px; border-top: 1px solid var(--line); padding-top: 8px; }
   ul, ol { margin: 0 0 11px; padding-left: 20px; }
   li { margin-bottom: 6px; }
-  .step { margin-bottom: 12px; }
+  .step { margin-bottom: 14px; padding-left: 14px; border-left: 3px solid var(--tint); }
   .step b { color: var(--primary-deep); }
-  .chip { display: inline-block; background: #E5EFEA; color: var(--primary-deep); font-size: 9.5pt;
-    padding: 2px 8px; border-radius: 999px; margin-right: 4px; }
+  .chip { display: inline-block; background: var(--tint); color: var(--primary-deep); font-size: 9.5pt;
+    padding: 2px 9px; border-radius: 999px; margin-right: 4px; }
   .org { margin-bottom: 8px; }
-  .org b { display: block; }
+  .org b { display: block; color: var(--primary-deep); }
   .org span { color: var(--muted); font-size: 10pt; }
 </style>

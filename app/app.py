@@ -1,4 +1,4 @@
-"""app/app.py — Refuge Gradio entrypoint.
+"""app/app.py — Fugee Gradio entrypoint.
 
 Run locally with::
 
@@ -110,7 +110,7 @@ _LOGO_SVG = (
 SITE_BAR_HTML = f"""
 <header id="site-bar"><div class="inner">
   {_LOGO_SVG}
-  <span class="name">Refuge</span>
+  <span class="name">Fugee</span>
   <span class="tag">Safe guidance for people on the move</span>
   <nav class="nav"><span>Intake</span><span>Interview</span><span>Assessment</span>
     <span>Recommendations</span><span>Documents</span></nav>
@@ -133,7 +133,7 @@ def _ready_for_assessment(session) -> bool:
 
 
 def build_app() -> gr.Blocks:
-    with gr.Blocks(title="Refuge", analytics_enabled=False) as demo:
+    with gr.Blocks(title="Fugee", analytics_enabled=False) as demo:
         gr.HTML(SITE_BAR_HTML)
         # Session + loop state shared across phases so each screen sees the same
         # session object.

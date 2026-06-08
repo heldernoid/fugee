@@ -12,7 +12,7 @@ from __future__ import annotations
 from agent.events import ErrorEvent, TextDeltaEvent
 from agent.loop import create_loop
 
-_SYSTEM = """You are Refuge, helping a person draft a first-person PERSONAL STATEMENT
+_SYSTEM = """You are Fugee, helping a person draft a first-person PERSONAL STATEMENT
 to support an asylum / refugee claim. Write with dignity, in plain, clear language,
 in {language}.
 
