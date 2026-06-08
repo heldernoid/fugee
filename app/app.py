@@ -52,10 +52,17 @@ FONT_IMPORT = (
 # #iv-screen) re-assert their own surface/border with higher specificity.
 GLOBAL_CSS = """
 footer { display: none !important; }
+/* Always reserve the scrollbar gutter so a tall screen (with a scrollbar) and a
+   short one (without) keep the SAME viewport width — otherwise the centered
+   container, and the nav inside it, jump sideways on every screen transition. */
+html { scrollbar-gutter: stable; overflow-y: scroll; }
 body, .gradio-container { background: var(--bg) !important; color: var(--text);
   font-family: var(--font-ui); }
-/* Wide shell like the mockup (main = 1180px); narrow screens cap themselves. */
-.gradio-container { max-width: 1180px !important; margin: 0 auto !important;
+/* Wide shell like the mockup (main = 1180px); narrow screens cap themselves.
+   width:100% pins the shell to the full available width so it never shrink-wraps
+   to the current phase's content — that shrink-wrap is what made the nav (which
+   spans this container) change size and re-center between screens. */
+.gradio-container { width: 100% !important; max-width: 1180px !important; margin: 0 auto !important;
   padding: 0 clamp(16px,4vw,32px) var(--s-xxl) !important; }
 .gradio-container button, .gradio-container input,
 .gradio-container textarea, .gradio-container select { font-family: var(--font-ui); }
