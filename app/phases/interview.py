@@ -43,6 +43,26 @@ AGENT_AVATAR = (
     '<path d="M16 7l7 6.5V25h-4.6v-6.2h-4.8V25H9V13.5L16 7z" fill="#fff"/></svg>'
 )
 
+# Interview chrome (rail steps + responder) in every supported language, so the
+# UI around the conversation matches the conversation's language.
+_CHROME = {
+    "English":    {"Intake": "Intake", "Situation": "Situation", "History": "History", "Goals": "Goals", "Review": "Review", "your_answer": "Your answer", "continue": "Continue →"},
+    "French":     {"Intake": "Accueil", "Situation": "Situation", "History": "Parcours", "Goals": "Objectifs", "Review": "Vérification", "your_answer": "Votre réponse", "continue": "Continuer →"},
+    "Spanish":    {"Intake": "Recepción", "Situation": "Situación", "History": "Trayecto", "Goals": "Objetivos", "Review": "Revisión", "your_answer": "Tu respuesta", "continue": "Continuar →"},
+    "Portuguese": {"Intake": "Acolhimento", "Situation": "Situação", "History": "Percurso", "Goals": "Objetivos", "Review": "Revisão", "your_answer": "Sua resposta", "continue": "Continuar →"},
+    "Arabic":     {"Intake": "الاستقبال", "Situation": "الوضع", "History": "المسار", "Goals": "الأهداف", "Review": "المراجعة", "your_answer": "إجابتك", "continue": "متابعة →"},
+    "Hindi":      {"Intake": "प्रवेश", "Situation": "स्थिति", "History": "इतिहास", "Goals": "लक्ष्य", "Review": "समीक्षा", "your_answer": "आपका उत्तर", "continue": "जारी रखें →"},
+    "Chinese":    {"Intake": "登记", "Situation": "情况", "History": "经历", "Goals": "目标", "Review": "确认", "your_answer": "您的回答", "continue": "继续 →"},
+    "Japanese":   {"Intake": "受付", "Situation": "状況", "History": "経緯", "Goals": "目標", "Review": "確認", "your_answer": "あなたの回答", "continue": "続ける →"},
+    "Korean":     {"Intake": "접수", "Situation": "상황", "History": "경위", "Goals": "목표", "Review": "확인", "your_answer": "당신의 답변", "continue": "계속 →"},
+    "Russian":    {"Intake": "Приём", "Situation": "Ситуация", "History": "История", "Goals": "Цели", "Review": "Проверка", "your_answer": "Ваш ответ", "continue": "Продолжить →"},
+}
+
+
+def _chrome(lang: str | None, key: str) -> str:
+    d = _CHROME.get(lang or "English", _CHROME["English"])
+    return d.get(key) or _CHROME["English"].get(key, key)
+
 INTERVIEW_CSS = """
 #iv-screen { background: var(--surface); border: 1px solid var(--line);
   border-radius: var(--r-lg); box-shadow: var(--shadow-md); overflow: hidden;
@@ -87,7 +107,7 @@ INTERVIEW_CSS = """
 # Rendering
 # --------------------------------------------------------------------------
 
-def render_rail(state: State) -> str:
+def render_rail(state: State, lang: str | None = "English") -> str:
     pills = []
     for i, (label, st) in enumerate(RAIL):
         if i:
@@ -99,7 +119,7 @@ def render_rail(state: State) -> str:
         else:
             cls, dot = "iv-pill", str(i + 1)
         pills.append(f'<div class="{cls}"><span class="dot">{dot}</span>'
-                     f'<span class="t">{html.escape(label)}</span></div>')
+                     f'<span class="t">{html.escape(_chrome(lang, label))}</span></div>')
     return f'<div class="iv-rail" aria-label="Interview progress">{"".join(pills)}</div>'
 
 
@@ -389,7 +409,7 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
             rail = gr.HTML(render_rail(State.SITUATION))
             chat = gr.HTML(render_chat([]))
             with gr.Column(elem_id="iv-responder"):
-                lbl = gr.HTML('<div class="label-row">Your answer</div>')
+                lbl = gr.HTML('<div class="label-row">Your answer</div>')  # localised per turn
                 # Pre-mount with choices so they render immediately when shown
                 # (Gradio is laggy updating choices on a freshly-revealed control).
                 radio = gr.Radio(choices=["Yes", "No"], label="", show_label=False, visible=False, elem_id="iv-choice")
@@ -409,7 +429,15 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
                                   placeholder="…", elem_id="iv-text")
                 cont = gr.Button("Continue →", elem_id="iv-continue")
 
-    stream_outputs = [chat, rail, radio, multi_grounds, multi_docs, country, text, session_st, loop_st, slot_idx_st]
+    stream_outputs = [chat, rail, radio, multi_grounds, multi_docs, country, text,
+                      session_st, loop_st, slot_idx_st, lbl, cont]
+
+    def _chrome_updates(session):
+        lang = session.language if session else "English"
+        return (
+            gr.update(value=f'<div class="label-row">{html.escape(_chrome(lang, "your_answer"))}</div>'),
+            gr.update(value=_chrome(lang, "continue")),
+        )
 
     async def _present(session, loop, idx):
         """Append the agent's message (scripted question, LLM review, or the
@@ -423,28 +451,33 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
         else:
             msg = _agent_message_for(session, idx, welcome=(idx == 0))
         session.messages = list(session.messages) + [{"role": "assistant", "content": msg}]
-        return (render_chat(session.messages), render_rail(session.state),
+        return (render_chat(session.messages), render_rail(session.state, session.language),
                 *control_updates(session, idx), session, idx)
 
     _HIDE5 = (gr.update(visible=False), gr.update(visible=False), gr.update(visible=False),
               gr.update(visible=False), gr.update(visible=False))
+    _KEEP5 = (gr.update(), gr.update(), gr.update(), gr.update(), gr.update())
 
-    async def _emit(o, loop):
-        """Reveal the active control in a SINGLE update that carries both
-        ``visible`` and ``choices`` together. A CheckboxGroup whose choices were
-        set while it was hidden builds no option DOM, so revealing it with a
-        ``visible``-only update paints it empty — the choices must ride along on
-        the reveal (this is exactly what the Continue path does, which worked).
-        ``o[2:7]`` are the control_updates from ``_present``."""
+    # The interview turn is split into TWO round-trips so a control reveal never
+    # rides in the same update as the chat re-render. When a CheckboxGroup's
+    # reveal competes with a large chat-HTML change in one frame, the browser
+    # drops its paint (it showed empty until an extra click). So the click
+    # handler only advances the conversation and HIDES the controls; a chained
+    # ``.then(reveal_controls)`` then reveals the right control on its own — a
+    # separate render cycle with nothing else changing, so it always paints.
+
+    async def _advance(o, loop):
+        """One frame: advance chat + rail, hide all controls (reveal comes next
+        round-trip). ``o`` is the tuple returned by ``_present`` (… , session, idx)."""
         session, idx = o[7], o[8]
-        yield (o[0], o[1], o[2], o[3], o[4], o[5], o[6], session, loop, idx)
+        yield (o[0], o[1], *_HIDE5, session, loop, idx, *_chrome_updates(session))
 
     async def start(session, loop, slot_idx=0):
         if session is None:
             session = SessionState(); session.transition_to(State.INTAKE)
         loop = loop or create_loop()
         o = await _present(session, loop, 0)
-        async for frame in _emit(o, loop):
+        async for frame in _advance(o, loop):
             yield frame
 
     async def on_continue(radio_v, grounds_v, docs_v, country_v, text_v, session, loop, idx):
@@ -452,7 +485,7 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
             session = SessionState(); session.transition_to(State.INTAKE)
             loop = loop or create_loop()
             o = await _present(session, loop, 0)
-            for frame in _frames(o, loop):
+            async for frame in _advance(o, loop):
                 yield frame
             return
         loop = loop or create_loop()
@@ -462,51 +495,66 @@ def build(visible: bool = True, session_st=None, loop_st=None, slot_idx_st=None)
         if idx == CORRECT_INDEX:
             correction = (text_v or "").strip()
             if not correction:
-                yield (gr.update(), gr.update(), *control_updates(session, idx), session, loop, idx)
+                yield (gr.update(), gr.update(), *_KEEP5, session, loop, idx, gr.update(), gr.update())
                 return
             session.messages = list(session.messages) + [{"role": "user", "content": correction}]
             await _apply_correction(session, loop, correction)
             o = await _present(session, loop, REVIEW_INDEX)
-            for frame in _frames(o, loop):
+            async for frame in _advance(o, loop):
                 yield frame
             return
 
         # Review step
         if idx >= REVIEW_INDEX:
             if not radio_v:
-                yield (gr.update(), gr.update(), *control_updates(session, idx), session, loop, idx)
+                yield (gr.update(), gr.update(), *_KEEP5, session, loop, idx, gr.update(), gr.update())
                 return
             session.messages = list(session.messages) + [{"role": "user", "content": radio_v}]
             if radio_v == t(lang, "review_yes"):
                 advance_to(session, State.ASSESSMENT)  # triggers assessment via .then()
                 yield (render_chat(session.messages), render_rail(session.state),
-                       *_HIDE5, session, loop, idx)
+                       *_HIDE5, session, loop, idx, gr.update(), gr.update())
                 return
             o = await _present(session, loop, CORRECT_INDEX)  # ask what to change
-            for frame in _frames(o, loop):
+            async for frame in _advance(o, loop):
                 yield frame
             return
 
         q = QUESTIONS[idx]
         display = _store(session, q, radio_v, grounds_v, docs_v, country_v, text_v)
         if display is None:
-            yield (gr.update(), gr.update(), *control_updates(session, idx), session, loop, idx)
+            yield (gr.update(), gr.update(), *_KEEP5, session, loop, idx, gr.update(), gr.update())
             return
         session.messages = list(session.messages) + [{"role": "user", "content": display}]
         o = await _present(session, loop, _next_index(session, idx))
-        async for frame in _emit(o, loop):
+        async for frame in _advance(o, loop):
             yield frame
+
+    control_comps = [radio, multi_grounds, multi_docs, country, text]
+
+    def reveal_controls(session, idx):
+        """Second round-trip: reveal the active control on its own (no chat change
+        competing for the paint). No-op once the interview has handed off to the
+        assessment (controls stay hidden)."""
+        if session is None or session.state >= State.ASSESSMENT:
+            return _HIDE5
+        return control_updates(session, idx)
 
     continue_event = cont.click(
         on_continue,
         inputs=[radio, multi_grounds, multi_docs, country, text, session_st, loop_st, slot_idx_st],
         outputs=stream_outputs,
+    ).then(
+        reveal_controls,
+        inputs=[session_st, slot_idx_st],
+        outputs=control_comps,
     )
 
     return InterviewUI(
         column=column, session=session_st, loop=loop_st, slot_idx=slot_idx_st,
         start_fn=start, start_inputs=[session_st, loop_st, slot_idx_st],
         stream_outputs=stream_outputs, continue_btn=cont, continue_event=continue_event,
+        reveal_fn=reveal_controls, reveal_inputs=[session_st, slot_idx_st], reveal_outputs=control_comps,
     )
 
 

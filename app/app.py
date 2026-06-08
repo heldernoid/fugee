@@ -168,10 +168,17 @@ def build_app() -> gr.Blocks:
             async for out in interview_ui.start_fn(session, loop):
                 yield (gr.update(visible=False), gr.update(visible=True), *out)
 
+        # Two round-trips: stream the first question (controls hidden), then
+        # reveal its control on its own so the CheckboxGroup isn't fighting the
+        # chat re-render for its paint (see interview.py).
         intake_ui.begin.click(
             begin,
             inputs=[intake_ui.selected_lang, interview_ui.session, interview_ui.loop],
             outputs=[intake_ui.column, interview_ui.column, *interview_ui.stream_outputs],
+        ).then(
+            interview_ui.reveal_fn,
+            inputs=interview_ui.reveal_inputs,
+            outputs=interview_ui.reveal_outputs,
         )
 
         async def maybe_assess(session, loop):
