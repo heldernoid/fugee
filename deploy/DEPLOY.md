@@ -76,25 +76,36 @@ which are uploaded next. The Space starts building on push.
 
 ## 4. Upload the binary data (RAG index + source PDFs)
 
-The HF Hub requires binary files to use Xet/LFS, which `hf upload` does
-automatically (no local git-lfs needed).
+These are gitignored (the HF Hub rejects binaries in plain git), so they're
+uploaded with `huggingface_hub`, which stores them via Xet automatically — **no
+local git-lfs needed**.
 
-The RAG index — needed at runtime by `guideline_search`:
-
-```bash
-hf upload build-small-hackathon/fugee \
-  specs/data/guidelines_index.json specs/data/guidelines_index.json \
-  --repo-type space
-```
-
-The 15 source UNHCR PDFs — not needed at runtime, but uploaded so the index's
-provenance is visible on the Space (upload the whole folder):
+⚠️ **Gotcha:** the hub upload helpers honour the *repo's* `.gitignore` (which we
+just pushed, and it ignores these very files) — they will silently skip them. So
+first delete `.gitignore` from the Space (a deployment doesn't need it), then
+upload. This Python snippet does the whole thing:
 
 ```bash
-hf upload build-small-hackathon/fugee \
-  specs/data/guidelines specs/data/guidelines \
-  --repo-type space
+python - <<'PY'
+from huggingface_hub import HfApi
+api, repo = HfApi(), "build-small-hackathon/fugee"
+api.delete_file(".gitignore", repo_id=repo, repo_type="space",
+                commit_message="Drop .gitignore on the Space so data assets upload")
+api.upload_file(path_or_fileobj="specs/data/guidelines_index.json",
+                path_in_repo="specs/data/guidelines_index.json",
+                repo_id=repo, repo_type="space")
+api.upload_folder(folder_path="specs/data/guidelines",
+                  path_in_repo="specs/data/guidelines",
+                  repo_id=repo, repo_type="space", allow_patterns=["*.pdf"])
+print("done")
+PY
 ```
+
+> ⚠️ **Don't `git push --force` after this.** The index/PDFs live *only* on the
+> Space (uploaded above), not in git. A force-push resets `main` to your local
+> commit and would **delete** them. To change code later: `git fetch space &&
+> git rebase space/main` then push, or edit on the Space, or re-run this upload
+> after the force-push.
 
 ---
 
