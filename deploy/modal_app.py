@@ -37,6 +37,10 @@ MODELS = [LLM_MODEL, EMBED_MODEL]
 
 GPU = os.environ.get("MODAL_GPU", "L4")                 # L4 (cheapest) | A10G | A100
 MIN_CONTAINERS = int(os.environ.get("MODAL_MIN_CONTAINERS", "0"))  # 1 = keep warm
+# Context window. Ollama's default (~4096) truncates our assessment prompt; load
+# the model at this size so it (and the app's per-request num_ctx) match -> no
+# reload on the first request. Must match the app's NUM_CTX.
+NUM_CTX = os.environ.get("NUM_CTX", "16384")
 OLLAMA_DIR = "/root/.ollama"                            # model cache (Volume mount)
 PORT = 11434
 
@@ -57,7 +61,7 @@ def _start_ollama(bind: str = "0.0.0.0", keep_alive: str | None = None) -> None:
 
     ``keep_alive="-1"`` tells Ollama never to unload the model from GPU while the
     container is warm, so a kept-warm endpoint answers in ~1s with no reload."""
-    env = {**os.environ, "OLLAMA_HOST": f"{bind}:{PORT}"}
+    env = {**os.environ, "OLLAMA_HOST": f"{bind}:{PORT}", "OLLAMA_CONTEXT_LENGTH": NUM_CTX}
     if keep_alive is not None:
         env["OLLAMA_KEEP_ALIVE"] = keep_alive
     subprocess.Popen(["ollama", "serve"], env=env)

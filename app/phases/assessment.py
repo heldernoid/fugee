@@ -161,29 +161,18 @@ _GROUND_MAP = {
 }
 
 
-# Phrases that mark a non-answer from the model — either a refusal / "need more
-# info", or a conversational greeting that ignores the facts already collected and
-# asks the person for input. Either way, replace it with the deterministic,
-# interview-grounded analysis (the facts are all in hand already).
-_WEAK_MARKERS = (
-    # refusals / "need more information"
-    "cannot determine", "could not determine", "can't determine", "unable to determine",
-    "need more", "more information", "additional details", "additional information",
-    "not enough information", "insufficient information", "unable to assess",
-    "cannot assess", "i cannot provide", "no specific case",
-    # conversational greetings / requests for info it already has
-    "could you tell me", "can you tell me", "please tell me", "please share",
-    "please provide", "when you're ready", "when you are ready", "i'm here to help",
-    "i am here to help", "here to help you", "preferred language", "which language",
-    "navigate your options", "let me know", "feel free to", "happy to help",
-)
+def _is_weak_reasoning(text: str, result) -> bool:
+    """Deterministic test for a non-answer — no brittle prose pattern-matching.
 
-
-def _is_weak_reasoning(text: str) -> bool:
-    t = (text or "").strip().lower()
-    if len(t) < 120:
+    The assessment is required to end with a structured block (case_type / grounds
+    / countries). The model is weak/off-task when it produced **none** of that
+    structure, or barely any narration. When that happens (e.g. it drifted into a
+    chatbot greeting because the context window truncated its instructions), the
+    interview-grounded analysis takes over. With an adequate context window this
+    rarely fires."""
+    if len((text or "").strip()) < 120:
         return True
-    return any(m in t for m in _WEAK_MARKERS)
+    return not (result.case_type or result.grounds or result.countries)
 
 
 def _derive_case(session: SessionState) -> tuple[str, list[str], str]:
@@ -402,7 +391,7 @@ async def stream_assessment(session: SessionState, loop):
     # narration is *weak* (a refusal / "I cannot determine …" / barely anything),
     # the interview-derived read takes over so the person never sees a non-answer.
     case_d, grounds_d, risk_d = _derive_case(session)
-    weak = _is_weak_reasoning(visible)
+    weak = _is_weak_reasoning(visible, result)
     case_type = case_d if weak else (result.case_type or case_d)
     grounds_final = grounds_d if weak else (result.grounds or grounds_d)
     risk_final = risk_d if weak else (result.risk or risk_d)

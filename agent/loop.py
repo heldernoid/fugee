@@ -94,6 +94,11 @@ class AgentLoop:
         self.model_id = model_id or os.getenv("MODEL_ID", DEFAULT_MODEL_ID)
         self.provider = os.getenv("MODEL_PROVIDER", "ollama")
         self._host = host or os.getenv("OLLAMA_HOST")
+        # Context window for Ollama. Its default is small (~4096); the assessment
+        # prompt (system + facts + injected guideline/country tool results) easily
+        # overflows that, which silently truncates the instructions and makes the
+        # model drift (e.g. answer as a chatbot). Give it real headroom.
+        self.num_ctx = int(os.getenv("NUM_CTX", "16384"))
         self._client = None  # lazily created so import never needs a server
         # Not all models accept the `think` parameter (e.g. qwen2.5:7b). We
         # optimistically try it, then disable it for this session on first
@@ -152,6 +157,7 @@ class AgentLoop:
                     tools=tool_schemas,
                     stream=True,
                     think=attempt_think,
+                    options={"num_ctx": self.num_ctx},
                 )
                 async for chunk in stream:
                     produced = True
