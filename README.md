@@ -1,19 +1,3 @@
----
-title: Fugee
-emoji: 🏠
-colorFrom: green
-colorTo: yellow
-sdk: gradio
-sdk_version: 6.15.2
-app_file: app/app.py
-pinned: false
-license: mit
-short_description: Agentic AI guidance for displaced people, on a small LLM
----
-
-<!-- The block above is Hugging Face Space metadata (required for the Space to
-     build). The hackathon submission tool appends track/badge tags to it. -->
-
 <div align="center">
 
 # 🏠 Fugee
@@ -22,6 +6,8 @@ short_description: Agentic AI guidance for displaced people, on a small LLM
 
 An agentic AI assistant for displaced people, asylum seekers, and refugees —
 powered by a small (≤32B) local LLM.
+
+🎥 **[Watch the demo](https://www.youtube.com/watch?v=PYGzJZj7LfM)** · 🤗 **[Live Space](https://huggingface.co/spaces/build-small-hackathon/fugee)**
 
 </div>
 
