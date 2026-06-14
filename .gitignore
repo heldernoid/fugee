@@ -18,6 +18,7 @@ tmp/
 # Environment
 .env
 .env.local
+.env.modal
 
 # OS
 .DS_Store

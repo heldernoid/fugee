@@ -46,15 +46,20 @@ app = modal.App("fugee-ollama")
 # cold starts don't re-download multi-GB weights.
 image = (
     modal.Image.debian_slim()
-    .apt_install("curl")
+    .apt_install("curl", "zstd")  # ollama's installer needs zstd to extract
     .run_commands("curl -fsSL https://ollama.com/install.sh | sh")
 )
 models_volume = modal.Volume.from_name("fugee-ollama-models", create_if_missing=True)
 
 
-def _start_ollama(bind: str = "0.0.0.0") -> None:
-    """Start ``ollama serve`` (bound so Modal can reach it) and wait until ready."""
+def _start_ollama(bind: str = "0.0.0.0", keep_alive: str | None = None) -> None:
+    """Start ``ollama serve`` (bound so Modal can reach it) and wait until ready.
+
+    ``keep_alive="-1"`` tells Ollama never to unload the model from GPU while the
+    container is warm, so a kept-warm endpoint answers in ~1s with no reload."""
     env = {**os.environ, "OLLAMA_HOST": f"{bind}:{PORT}"}
+    if keep_alive is not None:
+        env["OLLAMA_KEEP_ALIVE"] = keep_alive
     subprocess.Popen(["ollama", "serve"], env=env)
     for _ in range(180):
         try:
@@ -91,5 +96,16 @@ def download_models():
 @modal.web_server(port=PORT, startup_timeout=300, requires_proxy_auth=True)
 def serve():
     """GPU-backed Ollama HTTP endpoint, protected by Modal proxy auth."""
-    models_volume.reload()       # pick up models pulled by download_models
-    _start_ollama()
+    models_volume.reload()                 # pick up models pulled by download_models
+    _start_ollama(keep_alive="-1")         # never unload while the container is warm
+    # Preload the LLM into GPU so the very first user request is instant (no 40s
+    # load). Best paired with MODAL_MIN_CONTAINERS=1 to keep one container warm.
+    try:
+        subprocess.run(
+            ["ollama", "run", LLM_MODEL, "ok"],
+            env={**os.environ, "OLLAMA_HOST": f"127.0.0.1:{PORT}"},
+            timeout=180,
+            check=False,
+        )
+    except Exception:
+        pass
