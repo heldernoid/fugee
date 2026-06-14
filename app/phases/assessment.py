@@ -161,13 +161,21 @@ _GROUND_MAP = {
 }
 
 
-# Phrases that mark a non-answer from the model (a refusal or "need more info"),
-# which should be replaced by the deterministic, interview-grounded analysis.
+# Phrases that mark a non-answer from the model — either a refusal / "need more
+# info", or a conversational greeting that ignores the facts already collected and
+# asks the person for input. Either way, replace it with the deterministic,
+# interview-grounded analysis (the facts are all in hand already).
 _WEAK_MARKERS = (
+    # refusals / "need more information"
     "cannot determine", "could not determine", "can't determine", "unable to determine",
     "need more", "more information", "additional details", "additional information",
     "not enough information", "insufficient information", "unable to assess",
     "cannot assess", "i cannot provide", "no specific case",
+    # conversational greetings / requests for info it already has
+    "could you tell me", "can you tell me", "please tell me", "please share",
+    "please provide", "when you're ready", "when you are ready", "i'm here to help",
+    "i am here to help", "here to help you", "preferred language", "which language",
+    "navigate your options", "let me know", "feel free to", "happy to help",
 )
 
 

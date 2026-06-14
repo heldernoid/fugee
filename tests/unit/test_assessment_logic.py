@@ -9,6 +9,11 @@ def test_weak_reasoning_detected():
     assert _is_weak_reasoning("Based on the information provided, I cannot determine a case type.")
     assert _is_weak_reasoning("Additional details about your situation are needed to proceed.")
     assert _is_weak_reasoning("too short")
+    # a conversational greeting that ignores the collected facts
+    assert _is_weak_reasoning(
+        "Hello! I'm here to help you navigate your options. Could you tell me your "
+        "preferred language? If you have documents, please share them when you're ready."
+    )
     # a substantive analysis is NOT weak
     good = (
         "Based on what you shared, you face a well-founded fear of persecution on "
