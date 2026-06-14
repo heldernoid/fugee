@@ -14,9 +14,9 @@ agent/node_modules/
 # Generated documents (ephemeral)
 tmp/
 *.pdf
-# The source UNHCR guideline PDFs (RAG provenance) are NOT in git — the HF Hub
-# rejects binary files in plain git (must use Xet/LFS). They're uploaded to the
-# Space directly via `hf upload` (auto-Xet); see deploy/DEPLOY.md.
+# …but DO keep the source UNHCR guideline PDFs — they're the provenance of the
+# RAG index (build_guidelines_index.py) and small enough for plain git here.
+!specs/data/guidelines/*.pdf
 
 # Environment
 .env
@@ -39,6 +39,5 @@ data/processed/*.json
 # Enriched countries file is committed so the app/Space is ready without running
 # the pipeline (it's small; regenerate with data/scripts/enrich_downloader.py).
 
-# Guidelines RAG index (23 MB — not committed; uploaded to the Space via `hf
-# upload`, which handles LFS. Regenerate with data/scripts/build_guidelines_index.py)
-specs/data/guidelines_index.json
+# Guidelines RAG index is committed here (23 MB, under GitHub's 100 MB limit) so
+# the repo is self-contained. Regenerate with data/scripts/build_guidelines_index.py
