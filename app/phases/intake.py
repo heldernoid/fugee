@@ -74,6 +74,16 @@ INTAKE_CSS = """
   color:var(--text-muted); background:var(--surface-2); border:1px solid var(--line);
   padding:9px 16px; border-radius:var(--r-full); }
 .intake-trust svg { flex:0 0 auto; color:var(--primary); }
+
+/* Author credit — shown only on this first screen, never in the interview flow. */
+#intake-credit { margin-top:22px; display:flex; flex-direction:column; align-items:center; gap:5px; }
+#intake-credit .row { display:flex; flex-wrap:wrap; align-items:center; justify-content:center;
+  gap:8px; font-size:13px; color:var(--text-muted); }
+#intake-credit .sep { color:var(--line-strong); }
+#intake-credit a.icon { display:inline-flex; align-items:center; color:var(--text-muted); line-height:0; }
+#intake-credit a.icon svg { width:15px; height:15px; fill:currentColor; }
+#intake-credit a.icon:hover { color:var(--primary-deep); }
+#intake-credit .made { font-size:12px; color:var(--text-muted); }
 """
 
 _TOPO_SVG = """
@@ -111,6 +121,27 @@ _TRUST_HTML = """
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
   This conversation is private.
 </span></div>
+"""
+
+# LinkedIn glyph (monochrome, inherits currentColor to stay on-brand).
+_LINKEDIN_SVG = (
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.45 20.45h-3.56v-5.57c0-1.33-.03-3.04-1.85-3.04-1.86 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.41v1.56h.05c.47-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.07 2.07 0 1 1 0-4.14 2.07 2.07 0 0 1 0 4.14zM7.12 20.45H3.56V9h3.56v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.22.79 24 1.77 24h20.45c.98 0 1.78-.78 1.78-1.73V1.73C24 .77 23.2 0 22.22 0z"/></svg>'
+)
+# Author credit — first screen only. LinkedIn/Hugging Face as logo-icons; the
+# hackathon line sits on its own row below.
+_CREDIT_HTML = f"""
+<div id="intake-credit">
+  <div class="row">
+    <span class="sep">·</span>
+    <span>Built by Hélder Monteiro</span>
+    <span class="sep">·</span>
+    <a class="icon" href="https://www.linkedin.com/in/helmo" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" title="LinkedIn">{_LINKEDIN_SVG}</a>
+    <span class="sep">·</span>
+    <a class="icon" href="https://huggingface.co/helmo" target="_blank" rel="noopener noreferrer" aria-label="Hugging Face" title="Hugging Face">🤗</a>
+    <span class="sep">·</span>
+  </div>
+  <div class="made">Made for the Hugging Face Build Small Hackathon</div>
+</div>
 """
 
 
@@ -175,6 +206,7 @@ def build(visible: bool = True) -> IntakeUI:
             with gr.Row(elem_classes=["intake-cta"]):
                 begin = gr.Button("Begin", elem_id="intake-begin", interactive=False)
             gr.HTML(_TRUST_HTML)
+        gr.HTML(_CREDIT_HTML)  # author credit — below the card, intake screen only
 
     def _on_pill(clicked: str, current: str | None):
         new_selected = toggle_selection(clicked, current)
