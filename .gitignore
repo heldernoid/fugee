@@ -33,8 +33,9 @@ htmlcov/
 data/raw/*.json
 data/processed/*.json
 
-# Enriched countries file (regenerate with data/scripts/enrich_downloader.py)
-specs/data/countries_enriched.json
+# Enriched countries file is committed so the app/Space is ready without running
+# the pipeline (it's small; regenerate with data/scripts/enrich_downloader.py).
 
-# Guidelines RAG index (regenerate with data/scripts/build_guidelines_index.py)
+# Guidelines RAG index (23 MB — not committed; uploaded to the Space via `hf
+# upload`, which handles LFS. Regenerate with data/scripts/build_guidelines_index.py)
 specs/data/guidelines_index.json
