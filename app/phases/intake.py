@@ -75,8 +75,7 @@ INTAKE_CSS = """
   padding:9px 16px; border-radius:var(--r-full); }
 .intake-trust svg { flex:0 0 auto; color:var(--primary); }
 
-/* Hackathon credit — first screen only. @helmo links to the HF profile, which
-   carries the other follow links (LinkedIn, etc.). */
+/* Small hackathon attribution line, shown on the first screen only. */
 #intake-credit { margin-top:22px; text-align:center; font-size:12px; color:var(--text-muted); }
 #intake-credit a { color:var(--primary-deep); text-decoration:none; font-weight:600; }
 #intake-credit a:hover { color:var(--primary); text-decoration:underline; }
@@ -119,8 +118,7 @@ _TRUST_HTML = """
 </span></div>
 """
 
-# Hackathon credit — first screen only. @helmo points to the HF profile, which
-# carries the rest of the follow links.
+# Hackathon attribution line, shown on the first screen only.
 _CREDIT_HTML = (
     '<div id="intake-credit">Made by '
     '<a href="https://huggingface.co/helmo" target="_blank" rel="noopener noreferrer">@helmo</a> '
@@ -189,7 +187,7 @@ def build(visible: bool = True) -> IntakeUI:
             with gr.Row(elem_classes=["intake-cta"]):
                 begin = gr.Button("Begin", elem_id="intake-begin", interactive=False)
             gr.HTML(_TRUST_HTML)
-        gr.HTML(_CREDIT_HTML)  # author credit — below the card, intake screen only
+        gr.HTML(_CREDIT_HTML)  # attribution line, below the card (intake only)
 
     def _on_pill(clicked: str, current: str | None):
         new_selected = toggle_selection(clicked, current)

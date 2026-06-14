@@ -162,14 +162,12 @@ _GROUND_MAP = {
 
 
 def _is_weak_reasoning(text: str, result) -> bool:
-    """Deterministic test for a non-answer — no brittle prose pattern-matching.
+    """Deterministic test for a non-answer — no prose pattern-matching.
 
     The assessment is required to end with a structured block (case_type / grounds
-    / countries). The model is weak/off-task when it produced **none** of that
-    structure, or barely any narration. When that happens (e.g. it drifted into a
-    chatbot greeting because the context window truncated its instructions), the
-    interview-grounded analysis takes over. With an adequate context window this
-    rarely fires."""
+    / countries). The response is treated as unusable when it contains **none** of
+    that structure, or barely any narration — and the interview-grounded analysis
+    takes over instead. With an adequate context window this rarely fires."""
     if len((text or "").strip()) < 120:
         return True
     return not (result.case_type or result.grounds or result.countries)
