@@ -7,7 +7,7 @@
 An agentic AI assistant for displaced people, asylum seekers, and refugees —
 powered by a small (≤32B) local LLM.
 
-🎥 **[Watch the demo](https://www.youtube.com/watch?v=PYGzJZj7LfM)** · 🤗 **[Live Space](https://huggingface.co/spaces/build-small-hackathon/fugee)**
+🎥 **[Watch the demo](https://www.youtube.com/watch?v=PYGzJZj7LfM)** · 🤗 **[Live Space](https://huggingface.co/spaces/build-small-hackathon/fugee)** · 📣 **[Launch post](https://x.com/heldernoid/status/2066252940940067178)**
 
 </div>
 
