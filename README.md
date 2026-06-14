@@ -1,3 +1,19 @@
+---
+title: Fugee
+emoji: 🏠
+colorFrom: green
+colorTo: yellow
+sdk: gradio
+sdk_version: 6.15.2
+app_file: app/app.py
+pinned: false
+license: mit
+short_description: Agentic AI guidance for displaced people, on a small (≤32B) LLM
+---
+
+<!-- The block above is Hugging Face Space metadata (required for the Space to
+     build). The hackathon submission tool appends track/badge tags to it. -->
+
 <div align="center">
 
 # 🏠 Fugee
@@ -20,8 +36,13 @@ countries, and generates a personalised documentation package they can download
 and edit.
 
 It is a **single-process Gradio web app** backed by a **pure-Python agent loop**
-(`agent/loop.py`, ported from pi-agent-core's patterns) and a **small local LLM**
+(`agent/loop.py`, ported from pi-agent-core's patterns) and a **small (≤32B) LLM**
 served by Ollama. No Node.js, no microservices, no external database.
+
+> **This Space** runs the Gradio UI on free CPU and calls the LLM (`lfm2.5:8b`)
+> and embeddings (`nomic-embed-text`) on a GPU **Ollama** endpoint hosted on
+> [Modal](https://modal.com) — so the same code and the same small model run
+> unchanged, just on rented GPU. See [`deploy/DEPLOY.md`](deploy/DEPLOY.md).
 
 The design point: *a genuinely useful agentic product running on a small model.*
 The interview is fully **deterministic** (fixed questions and controls,
@@ -94,14 +115,37 @@ Read at startup by `app/config.py` (no `python-dotenv` dependency):
 
 | Variable        | Meaning                                                        | Example |
 |-----------------|----------------------------------------------------------------|---------|
-| `OLLAMA_HOST`   | Base URL of your Ollama server                                 | `http://192.168.0.233:11434` |
+| `OLLAMA_HOST`   | Base URL of the Ollama server (local, LAN, or Modal endpoint)  | `http://127.0.0.1:11434` |
 | `MODEL_ID`      | The single ≤32B tool-calling instruct model for the whole app  | `lfm2.5:8b` |
 | `MODEL_PROVIDER`| `ollama` (default) or a litellm provider name                  | `ollama` |
+| `NUM_CTX`       | Ollama context window — keep large; the small default truncates the assessment prompt | `16384` |
+| `MODAL_KEY` / `MODAL_SECRET` | Proxy-auth headers when `OLLAMA_HOST` is a protected Modal endpoint (hosted demo only) | — |
 
 > **One model, no fallback.** The hackathon build deliberately uses a single
 > small model end to end. `web_search` is **disabled** — the assessment is
 > grounded only in sources we control (curated country data + UNHCR guidelines),
 > so no Tavily key is required.
+
+---
+
+## Live demo: Hugging Face Space + Modal
+
+The deployed demo splits into two pieces so it runs **free** and **fast** without
+changing the app or the model:
+
+```
+HF Space (free CPU, Gradio)            Modal (GPU, Ollama)
+┌──────────────────────────┐  HTTPS   ┌──────────────────────────────┐
+│ app/app.py + curated data │ ───────▶ │ ollama serve                 │
+│ + guidelines RAG (cosine) │  proxy   │   • lfm2.5:8b   (assessment) │
+│ OLLAMA_HOST → Modal URL   │  auth    │   • nomic-embed-text  (RAG)  │
+└──────────────────────────┘          └──────────────────────────────┘
+```
+
+The Space sets `OLLAMA_HOST` to the Modal endpoint and sends the proxy-auth
+headers (`agent/ollama_auth.py`); everything else is identical to local. Full,
+copy-pasteable steps — create the Space, deploy Modal, set secrets, upload the
+RAG index — are in **[`deploy/DEPLOY.md`](deploy/DEPLOY.md)**.
 
 ---
 
