@@ -227,6 +227,15 @@ def _synth_reasoning(session: SessionState, result, recs: list[dict],
     """A substantive, readable analysis built deterministically from the facts —
     used when the model's own narration was too thin to show. Markdown so the
     renderer gives it structure (bold, bullets)."""
+    # Unclear / non-genuine input: don't narrate a protection story we can't
+    # support — say plainly we need a real account (mirrors the gate in the prompt).
+    if case_type == "unclear":
+        return (
+            "I couldn't determine your situation clearly from what was shared. "
+            "To give you real options, please go back and describe — in your own "
+            "words — **what happened and why you left**, and pick the reason that "
+            "best fits. With a genuine account I can assess your case properly."
+        )
     iv = session.interview
     in_origin = bool(iv.current_country and iv.origin_country
                      and iv.current_country.strip().lower() == iv.origin_country.strip().lower())
@@ -416,7 +425,7 @@ async def stream_assessment(session: SessionState, loop):
         if not recs:  # last resort: the curated labour-migration shortlist
             for rec in work_route_countries():
                 _add(rec)
-    else:
+    elif case_type in ("refugee", "broader_protection", "statelessness"):
         # Protection case: the model's named countries, then TOP UP to 2–3 with the
         # person's own stated destination preferences (looked up, signatory-only),
         # then strong curated systems — so the screen always shows real choices.
@@ -428,6 +437,10 @@ async def stream_assessment(session: SessionState, loop):
         if len(recs) < 2:
             for rec in strong_asylum_destinations():
                 _add(rec)
+    # else: case_type == "unclear" (or unknown) — we could NOT establish a genuine
+    # situation (e.g. nonsensical / test / jailbreak input). Recommend nothing:
+    # fabricating destinations from junk would be misleading. The recommendations
+    # screen renders a "needs more info" panel when recs is empty.
     recs = recs[:3]
 
     # Guarantee a substantive reasoning even if the model's narration was thin/weak.

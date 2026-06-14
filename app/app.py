@@ -205,13 +205,12 @@ def build_app() -> gr.Blocks:
         reco_outputs = [assess_ui.column, reco_ui.column, *reco_ui.render_outputs, session_st]
 
         def show_recommendations(session):
-            # Reveal the recommendations only when the person clicks "See your
-            # recommendations" — so they can read the assessment first.
-            ready = (
-                session is not None
-                and session.state >= State.RECOMMENDATIONS
-                and session.assessment.recommended_countries
-            )
+            # Reveal the recommendations once the assessment has run (the person
+            # clicks "See your recommendations" so they can read the assessment
+            # first). We deliberately do NOT require recommended_countries to be
+            # non-empty: an unclear case has no recommendations, and the screen
+            # must still open to show the "needs more info" panel.
+            ready = session is not None and session.state >= State.RECOMMENDATIONS
             if not ready:
                 return [gr.update()] * len(reco_outputs)
             updates = reco_ui.populate(session)

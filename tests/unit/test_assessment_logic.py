@@ -1,7 +1,7 @@
 """tests/unit/test_assessment_logic.py — deterministic assessment fallbacks."""
 
 from app.assessment_parse import AssessmentResult
-from app.phases.assessment import _derive_case, _is_weak_reasoning
+from app.phases.assessment import _derive_case, _is_weak_reasoning, _synth_reasoning
 from app.state.session import SessionState
 
 _EMPTY = AssessmentResult()
@@ -36,6 +36,16 @@ def _seed(types, danger):
     s.interview.persecution_types = types
     s.interview.immediate_danger = danger
     return s
+
+
+def test_unclear_synth_does_not_fabricate_a_protection_story():
+    s = SessionState()
+    s.interview.origin_country = "Afghanistan"
+    s.interview.free_text_history = "i dont know what is 1+1"  # junk
+    msg = _synth_reasoning(s, _EMPTY, [], "unclear", [], "low")
+    assert "could" in msg.lower() and "what happened" in msg.lower()
+    assert "the country you fear" not in msg.lower()   # no invented persecution
+    assert "refugee" not in msg.lower()
 
 
 def test_derive_case_from_interview():

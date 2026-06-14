@@ -315,18 +315,29 @@ _PROTECTION_INTRO = (
     "achievable options near you. Each is matched to your profile — not a generic "
     "ranking.</p>"
 )
+# Short framing only — the full honest explanation lives in the assessment.
 _ECONOMIC_INTRO = (
-    '<p class="reco__intro">From what you shared, your situation looks mainly '
-    "<b>economic</b> — the search for work and a better income. That is real and "
-    "hard, but it is important to be honest: <b>asylum is not the right route for "
-    "economic migration</b>, and a refused asylum claim can leave you stuck, unable "
-    "to work, and at risk of removal. Instead, here are real <b>work-migration</b> "
-    "destinations with active routes for foreign workers — read each one's guidance "
-    "carefully, because they come with conditions.</p>"
+    '<p class="reco__intro"><b>Work-migration</b> destinations matched to your '
+    "profile. Asylum is not the route for an economic move, so read each one's "
+    "conditions carefully.</p>"
+)
+# Shown when the case could not be determined (e.g. unclear or non-genuine input).
+_UNCLEAR_INTRO = (
+    '<p class="reco__intro">I could not determine your situation clearly enough to '
+    "recommend destinations. Please go back and describe, in your own words, "
+    "<b>what happened and why you left</b> — and choose the reason that fits. Then "
+    "I can suggest real options.</p>"
 )
 
 
+def needs_more_info(session: SessionState) -> bool:
+    """No usable recommendations — the case is unclear / input was not genuine."""
+    return not _recs(session)
+
+
 def intro_html(session: SessionState) -> str:
+    if needs_more_info(session):
+        return _UNCLEAR_INTRO
     return _ECONOMIC_INTRO if is_economic_case(session) else _PROTECTION_INTRO
 
 
@@ -394,9 +405,9 @@ def build(visible: bool = False, session_st: gr.State | None = None) -> Recommen
                 out.append(gr.update(visible=False))
         sel_rec = next((r for r in recs if r.get("country") == selected), None)
         out.append(gr.update(value=roadmap_html(sel_rec, economic=economic)))
-        # An economic case is not an asylum claim, so don't offer to generate an
-        # asylum document package. The work-route guidance is the destination.
-        out.append(gr.update(visible=not economic))
+        # Proceed to documents only for a real protection case. Hide it for an
+        # economic case (no asylum package) and when the case is unclear/no recs.
+        out.append(gr.update(visible=bool(recs) and not economic))
         return out
 
     def populate(session: SessionState) -> list:
