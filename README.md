@@ -169,7 +169,7 @@ fugee/
 ├── tests/                  # unit / integration (no model) + e2e (real model)
 ├── DESIGN.md               # design tokens (authoritative)
 ├── mockup.html             # visual reference for every phase
-├── CLAUDE.md               # agent working rules for this repo
+├── AGENTS.md               # agent working rules for this repo
 └── requirements.txt
 ```
 
@@ -201,7 +201,7 @@ The interview questions, options, and chrome are hand-translated for all ten.
 
 ## For contributors / agents
 
-- **`CLAUDE.md`** — the single source of truth for how to work in this repo
+- **`AGENTS.md`** — the single source of truth for how to work in this repo
   (critical rules, design authority, sign-off gates). Read it first.
 - **`DESIGN.md` + `mockup.html`** — authoritative for every visual decision.
 - **`specs/ISSUES.md`** — hard-won gotchas and their real fixes (e.g. the Gradio

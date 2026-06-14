@@ -11,7 +11,7 @@ Data source (priority order, loaded once at import — never re-read per call):
 
 Both share the same schema (see specs/data/README.md). If a country is not
 found the tool returns ``{"error": "not_found"}`` — it never fabricates data
-(CLAUDE.md Critical Rule 1).
+(AGENTS.md).
 """
 
 from __future__ import annotations

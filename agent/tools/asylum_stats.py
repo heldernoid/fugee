@@ -7,7 +7,7 @@ real recognition rate for a *specific* origin→destination pair (e.g. Ethiopian
 applying in Kenya vs Egypt), not just per-country averages.
 
 Returns real data or a structured ``{"error": ...}`` — never fabricated figures
-(CLAUDE.md Critical Rule 1). If the data has not been downloaded yet, it says so.
+(AGENTS.md). If the data has not been downloaded yet, it says so.
 """
 
 from __future__ import annotations

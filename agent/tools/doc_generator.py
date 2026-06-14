@@ -5,7 +5,7 @@ is drafted by the LLM** (see agent/drafting.py) — an in-depth, first-person
 narrative with ``[placeholders]`` the person completes — and every document is
 exported as both an **editable Word (.docx)** file and a print-ready **PDF**.
 Country facts come from the curated data via country_lookup; nothing is
-fabricated (CLAUDE.md Rule 4).
+fabricated (AGENTS.md).
 """
 
 from __future__ import annotations

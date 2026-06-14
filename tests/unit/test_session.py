@@ -1,7 +1,7 @@
 """tests/unit/test_session.py — interview state machine (T012 / SC-005).
 
 Forward transitions are allowed; backward or skipped transitions raise
-ValueError. The interview is append-only and forward-only (CLAUDE.md Rule 3).
+ValueError. The interview is append-only and forward-only (AGENTS.md).
 """
 
 import pytest

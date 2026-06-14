@@ -1,7 +1,7 @@
 # ARCHITECTURE.md — Refuge
 
 > System architecture, data flow, and component contracts.
-> Read `CLAUDE.md` first, then this file, then `PLAN.md`.
+> Read `AGENTS.md` first, then this file, then `PLAN.md`.
 
 ---
 
@@ -449,7 +449,7 @@ weasyprint==62.x
 httpx==0.27.x
 pytest==8.x
 ollama==0.x          # LLM calls to local Ollama instance
-litellm==1.x         # Optional: multi-provider abstraction (Ollama + Modal + Anthropic)
+litellm==1.x         # Optional: multi-provider abstraction (Ollama, Modal, OpenAI-compatible)
 ```
 
 Lock file (`requirements.txt`) is committed.

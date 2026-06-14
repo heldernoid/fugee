@@ -25,7 +25,7 @@ Read these files **in order**. Do not skip any.
 | # | File | What it contains |
 |---|---|---|
 | 1 | `AGENTS.md` | Your rules, roles, commit format, escalation protocol |
-| 2 | `CLAUDE.md` | Project overview, critical rules, dev commands |
+| 2 | `AGENTS.md` | Project overview, critical rules, dev commands |
 | 3 | `DESIGN.md` | Design tokens — colors, typography, spacing. Canonical. |
 | 4 | `specs/ARCHITECTURE.md` | System contracts, data flow, component schemas |
 | 5 | `specs/PLAN.md` | Phased tasks (T001–T062) and success criteria (SC-001–SC-051) |
@@ -96,7 +96,7 @@ When you reach one:
 - Never self-certify a success criterion without running the test
 - Never use colors or spacing values outside `DESIGN.md`
 - Never start the next phase without explicit go-ahead
-- Never modify `AGENTS.md`, `CLAUDE.md`, `specs/PLAN.md`, or `specs/ARCHITECTURE.md`
+- Never modify `AGENTS.md`, `AGENTS.md`, `specs/PLAN.md`, or `specs/ARCHITECTURE.md`
   without explicit developer instruction
 
 ## Tech stack summary

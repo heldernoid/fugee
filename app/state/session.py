@@ -2,7 +2,7 @@
 
 The interview follows a strict, forward-only state machine. Once the person
 has moved forward, earlier answers are append-only — backward transitions
-raise ``ValueError`` (CLAUDE.md Critical Rule 3; ARCHITECTURE.md §3).
+raise ``ValueError`` (AGENTS.md; ARCHITECTURE.md §3).
 
 Session state is in-memory only for the hackathon: no database, no external
 logging of personal data (ARCHITECTURE.md §Security and Privacy).

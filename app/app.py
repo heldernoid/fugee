@@ -10,7 +10,7 @@ DESIGN.md tokens (via ``app.design_tokens``) and mockup.html. The intake screen
 streams the interview (Phase 2).
 
 All colours, fonts, radii, and spacing come from DESIGN.md — never hardcoded
-here (CLAUDE.md Design Rule 7).
+here (AGENTS.md).
 """
 
 from __future__ import annotations

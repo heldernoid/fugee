@@ -1,6 +1,6 @@
 """app/design_tokens.py — single source for DESIGN.md tokens in Python.
 
-DESIGN.md is the canonical design system (CLAUDE.md Design Rule 7) and
+DESIGN.md is the canonical design system (AGENTS.md) and
 ``mockup.html`` is the visual reference. To guarantee the Gradio app matches
 both, this module parses DESIGN.md's YAML frontmatter and emits CSS custom
 properties using the **same variable names as mockup.html** (``--primary``,

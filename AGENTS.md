@@ -1,8 +1,8 @@
-# AGENTS.md — Refuge
+# AGENTS.md — Fugee
 
 > Configuration for all AI agents working in this repository.
-> Codex, Claude Code, Cursor, Gemini CLI, and any other agent must read
-> this file before working in this project.
+> Codex, Cursor, Gemini CLI, and any other agent must read this file before
+> working in this project. This is the single, canonical agent doc.
 
 ---
 
@@ -21,7 +21,7 @@ Agents MUST read these files in order before starting any task:
 
 | Order | File | What it contains |
 |---|---|---|
-| 1 | `CLAUDE.md` | Project overview, critical rules, dev commands |
+| 1 | `README.md` | Project overview, how to run, deploy summary |
 | 2 | `DESIGN.md` | Design tokens — colors, typography, spacing, components |
 | 3 | `specs/ARCHITECTURE.md` | System design, data flow, component contracts |
 | 4 | `specs/PLAN.md` | Phases, tasks, success criteria, checkpoints |
@@ -109,12 +109,6 @@ include: "Posted by [agent name] on behalf of @[developer]."
 
 ## Capabilities by Agent
 
-### Claude Code / Claude (Anthropic)
-
-- Context file: `CLAUDE.md` (this project's primary)
-- Preferred for: Gradio UI implementation, Python logic, prompt engineering
-- Skill path: `.claude/commands/` (if spec-kit is configured)
-
 ### Codex CLI (OpenAI)
 
 - Context file: `AGENTS.md` (this file)
@@ -133,7 +127,7 @@ include: "Posted by [agent name] on behalf of @[developer]."
 ### Cursor / Windsurf
 
 - Rules path: `.cursor/rules/` or `.windsurf/rules/`
-- Same rules as above apply — read `CLAUDE.md` first
+- Same rules as above apply — read `AGENTS.md` first
 
 ---
 

@@ -3,7 +3,7 @@
 Uses the agent loop to draft an in-depth, first-person personal statement from
 the person's own answers, in their language, inserting clearly-marked
 ``[placeholders]`` for specifics not collected (name, dates, names of people/
-places) so they can complete and edit it. Facts are never invented (CLAUDE.md
+places) so they can complete and edit it. Facts are never invented (AGENTS.md
 Rule 4) — the model expands respectfully only on what the person said.
 """
 

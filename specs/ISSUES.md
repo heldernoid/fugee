@@ -177,7 +177,7 @@ bare one-liner, and recommendations could end up empty.
   occasionally return little.
 - **Correctness is a safety property here.** Never recommend asylum for an
   economic case or a non-signatory destination. Wrong output is worse than no
-  output (see `CLAUDE.md`).
+  output (see `AGENTS.md`).
 - **Verify, don't self-certify.** The author cannot see the browser from the
   agent sandbox; logic/data were verified with tests and smoke scripts, and the
   human verified the pixels. Keep that division of labour in mind.
