@@ -37,8 +37,10 @@ def _index() -> dict:
 
 def _embed(query: str) -> list[float]:
     import ollama
+
+    from agent.ollama_auth import ollama_headers
     model = (_index().get("model")) or os.getenv("EMBED_MODEL", EMBED_MODEL_DEFAULT)
-    client = ollama.Client(host=os.getenv("OLLAMA_HOST"))
+    client = ollama.Client(host=os.getenv("OLLAMA_HOST"), headers=ollama_headers() or None)
     return client.embed(model=model, input=query)["embeddings"][0]
 
 

@@ -124,7 +124,9 @@ class AgentLoop:
         if self._client is None:
             import ollama
 
-            self._client = ollama.AsyncClient(host=self._host)
+            from agent.ollama_auth import ollama_headers
+
+            self._client = ollama.AsyncClient(host=self._host, headers=ollama_headers() or None)
         return self._client
 
     def _tool_map(self, tools: list[AgentTool]) -> dict[str, AgentTool]:
