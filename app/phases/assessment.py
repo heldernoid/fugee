@@ -161,6 +161,23 @@ _GROUND_MAP = {
 }
 
 
+# Phrases that mark a non-answer from the model (a refusal or "need more info"),
+# which should be replaced by the deterministic, interview-grounded analysis.
+_WEAK_MARKERS = (
+    "cannot determine", "could not determine", "can't determine", "unable to determine",
+    "need more", "more information", "additional details", "additional information",
+    "not enough information", "insufficient information", "unable to assess",
+    "cannot assess", "i cannot provide", "no specific case",
+)
+
+
+def _is_weak_reasoning(text: str) -> bool:
+    t = (text or "").strip().lower()
+    if len(t) < 120:
+        return True
+    return any(m in t for m in _WEAK_MARKERS)
+
+
 def _derive_case(session: SessionState) -> tuple[str, list[str], str]:
     """Deterministic (case_type, grounds, risk) read from the interview alone —
     the safety net when the model returns nothing parseable."""
@@ -373,9 +390,14 @@ async def stream_assessment(session: SessionState, loop):
             into.append(rec)
 
     # Fall back to a deterministic read of the interview for anything the model
-    # left blank, so the case is never classified as "nothing".
+    # left blank, so the case is never classified as "nothing". When the model's
+    # narration is *weak* (a refusal / "I cannot determine …" / barely anything),
+    # the interview-derived read takes over so the person never sees a non-answer.
     case_d, grounds_d, risk_d = _derive_case(session)
-    case_type = result.case_type or case_d
+    weak = _is_weak_reasoning(visible)
+    case_type = case_d if weak else (result.case_type or case_d)
+    grounds_final = grounds_d if weak else (result.grounds or grounds_d)
+    risk_final = risk_d if weak else (result.risk or risk_d)
 
     def _add(rec: dict) -> None:
         cname = (rec.get("country") or "").strip()
@@ -398,21 +420,25 @@ async def stream_assessment(session: SessionState, loop):
             for rec in work_route_countries():
                 _add(rec)
     else:
+        # Protection case: the model's named countries, then TOP UP to 2–3 with the
+        # person's own stated destination preferences (looked up, signatory-only),
+        # then strong curated systems — so the screen always shows real choices.
         _collect(result.countries, recs, seen)
-        # Fallback: the countries the agent actually looked up during reasoning…
         if not recs:
             _collect(looked_up, recs, seen)
-        # …and a last-resort curated shortlist so the screen is never empty.
-        if not recs:
+        if len(recs) < 3:
+            _collect(session.interview.destination_preferences or [], recs, seen)
+        if len(recs) < 2:
             for rec in strong_asylum_destinations():
                 _add(rec)
+    recs = recs[:3]
 
-    # Guarantee a substantive reasoning even if the model's narration was thin.
-    if len(visible.strip()) < 120:
-        visible = _synth_reasoning(session, result, recs, case_type, grounds_d, risk_d)
+    # Guarantee a substantive reasoning even if the model's narration was thin/weak.
+    if weak or len(visible.strip()) < 120:
+        visible = _synth_reasoning(session, result, recs, case_type, grounds_final, risk_final)
 
-    session.assessment.convention_grounds = result.grounds or grounds_d
-    session.assessment.risk_level = result.risk or risk_d
+    session.assessment.convention_grounds = grounds_final
+    session.assessment.risk_level = risk_final
     session.assessment.case_type = case_type
     session.assessment.reasoning_trace = visible
     session.assessment.recommended_countries = recs

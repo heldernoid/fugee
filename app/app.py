@@ -223,16 +223,34 @@ def build_app() -> gr.Blocks:
         # Recommendations -> Documents: generate the package for the chosen country.
         docs_outputs = [reco_ui.column, docs_ui.column, *docs_ui.render_outputs]
 
+        _docs_loading = (
+            '<article class="doc" style="text-align:center;padding:44px 20px;">'
+            '<div style="font-size:15px;font-weight:700;color:var(--primary-deep)">'
+            'Preparing your document package…</div>'
+            '<p style="margin-top:8px;color:var(--text-secondary)">Fugee is drafting your '
+            'personal statement and building your Word&nbsp;+&nbsp;PDF files. This takes a few moments.</p>'
+            '</article>'
+        )
+
         async def show_documents(session):
+            # Generator: reveal the documents screen with a status message FIRST,
+            # then run the LLM draft + file generation, so the click never looks
+            # like nothing is happening.
             if session is None or not session.selected_country:
-                return [gr.update()] * len(docs_outputs)
+                yield [gr.update()] * len(docs_outputs)
+                return
             if session.state < State.DOCUMENTS:
                 from app.phases.interview import advance_to
                 advance_to(session, State.DOCUMENTS)
-            updates = await docs_ui.populate(session)  # LLM drafts the statement
-            return [gr.update(visible=False), gr.update(visible=True), *updates]
+            # 1) switch to the docs screen immediately, showing a "preparing…" note
+            yield [gr.update(visible=False), gr.update(visible=True),
+                   gr.update(value=_docs_loading), gr.update(), gr.update(), gr.update()]
+            # 2) draft (LLM) + generate Word/PDF, then render the finished package
+            updates = await docs_ui.populate(session)
+            yield [gr.update(visible=False), gr.update(visible=True), *updates]
 
-        reco_ui.proceed.click(show_documents, inputs=[session_st], outputs=docs_outputs)
+        reco_ui.proceed.click(show_documents, inputs=[session_st], outputs=docs_outputs,
+                              show_progress="hidden")
 
         # Start over: return to the intake screen for a fresh session.
         def start_over():
