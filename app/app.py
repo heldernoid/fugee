@@ -217,7 +217,10 @@ def build_app() -> gr.Blocks:
             return [gr.update(visible=False), gr.update(visible=True), *updates, session]
 
         # The person reads the assessment, then clicks to see recommendations.
-        assess_ui.proceed.click(show_recommendations, inputs=[session_st], outputs=reco_outputs)
+        # show_progress="hidden": this just renders cards (pure Python); the generic
+        # overlay would paint stray "processing…" spinners on the card components.
+        assess_ui.proceed.click(show_recommendations, inputs=[session_st], outputs=reco_outputs,
+                                show_progress="hidden")
 
         # Recommendations -> Documents: generate the package for the chosen country.
         docs_outputs = [reco_ui.column, docs_ui.column, *docs_ui.render_outputs]

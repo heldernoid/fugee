@@ -422,10 +422,14 @@ def build(visible: bool = False, session_st: gr.State | None = None) -> Recommen
         return [*_updates(session), session]
 
     for i in range(MAX_CARDS):
+        # show_progress="hidden": selecting a card just re-renders HTML (instant,
+        # pure Python). Gradio's generic per-component overlay would otherwise paint
+        # a stray "processing…" spinner on the card being updated.
         btns[i].click(
             lambda session, idx=i: select(idx, session),
             inputs=[session_st],
             outputs=[*render_outputs, session_st],
+            show_progress="hidden",
         )
 
     return RecommendationsUI(
