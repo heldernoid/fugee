@@ -8,7 +8,7 @@ sdk_version: 6.15.2
 app_file: app/app.py
 pinned: false
 license: mit
-short_description: Agentic AI guidance for displaced people, on a small (≤32B) LLM
+short_description: Agentic AI guidance for displaced people, on a small LLM
 ---
 
 <!-- The block above is Hugging Face Space metadata (required for the Space to
