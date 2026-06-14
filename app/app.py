@@ -96,6 +96,15 @@ body, .gradio-container { background: var(--bg) !important; color: var(--text);
   padding:7px 12px; border-radius:var(--r-full); white-space:nowrap; }
 @media(max-width:860px){ #site-bar .nav, #site-bar .tag { display:none; } }
 
+/* Discreet credit footer (a <div>, since the real <footer> is hidden above) */
+#site-footer { margin-top: var(--s-xxl); padding: 22px clamp(16px,4vw,32px) 6px;
+  border-top: 1px solid var(--line); display:flex; flex-wrap:wrap; gap:8px;
+  align-items:center; justify-content:center; font-size:13px; color:var(--text-muted); }
+#site-footer a { color:var(--primary-deep); text-decoration:none; font-weight:500; }
+#site-footer a:hover { color:var(--primary); text-decoration:underline; }
+#site-footer .sep { color:var(--line-strong); }
+#site-footer .tag { color:var(--text-muted); }
+
 /* Per-phase header (tag + description), like the mockup */
 .phase-head { display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; margin-bottom:var(--s-lg); }
 .phase-head .ptag { font-size:11.5px; font-weight:600; letter-spacing:.13em; text-transform:uppercase;
@@ -126,6 +135,22 @@ SITE_BAR_HTML = f"""
   <span class="name">Fugee</span>
   <span class="tag">Safe guidance for people on the move</span>
 </div></header>
+"""
+
+# Discreet credit at the very bottom — kept out of the intake/interview flow so it
+# never competes with the calm, private tone shown to a vulnerable person. Links
+# open in a new tab. Note: it's a <div>, not a <footer>, because GLOBAL_CSS hides
+# Gradio's own <footer>.
+FOOTER_HTML = """
+<div id="site-footer">
+  <span>Built by <a href="https://www.linkedin.com/in/helmo" target="_blank" rel="noopener noreferrer">Hélder Monteiro</a></span>
+  <span class="sep">·</span>
+  <a href="https://www.linkedin.com/in/helmo" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+  <span class="sep">·</span>
+  <a href="https://huggingface.co/helmo" target="_blank" rel="noopener noreferrer">🤗 Hugging Face</a>
+  <span class="sep">·</span>
+  <span class="tag">Made for the Hugging Face Build Small Hackathon</span>
+</div>
 """
 
 
@@ -268,6 +293,9 @@ def build_app() -> gr.Blocks:
             outputs=[intake_ui.column, interview_ui.column, assess_ui.column,
                      reco_ui.column, docs_ui.column, session_st, loop_st],
         )
+
+        # Credit footer, created last so it renders at the bottom of every screen.
+        gr.HTML(FOOTER_HTML)
 
     return demo
 
