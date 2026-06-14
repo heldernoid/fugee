@@ -59,27 +59,40 @@ hf repo create build-small-hackathon/fugee --repo-type space --space-sdk gradio
 
 ## 3. Push the code to the Space
 
-The Space is its own git repo. Add it as a remote and push the current branch to
-its `main` (force, to replace the starter README on first deploy):
+The Space is its own git repo. Add it as a remote and push `main` (force, to
+replace the starter README HF created on the first deploy):
 
 ```bash
 git remote add space https://huggingface.co/spaces/build-small-hackathon/fugee
-git push space HEAD:main --force
+git push space main --force
 ```
 
-This pushes everything except gitignored files — so **not** the 23 MB RAG index
-(next step). The Space starts building on push.
+This pushes everything except gitignored files — code, `countries.json`,
+`countries_enriched.json`, bundled fonts, etc. It does **not** include the binary
+data the HF Hub requires Xet/LFS for — the 23 MB RAG index and the source PDFs —
+which are uploaded next. The Space starts building on push.
 
 ---
 
-## 4. Upload the RAG index (gitignored → uploaded directly)
+## 4. Upload the binary data (RAG index + source PDFs)
 
-`specs/data/guidelines_index.json` is needed at runtime for `guideline_search`.
-`hf upload` stores it via LFS automatically (no local git-lfs required):
+The HF Hub requires binary files to use Xet/LFS, which `hf upload` does
+automatically (no local git-lfs needed).
+
+The RAG index — needed at runtime by `guideline_search`:
 
 ```bash
 hf upload build-small-hackathon/fugee \
   specs/data/guidelines_index.json specs/data/guidelines_index.json \
+  --repo-type space
+```
+
+The 15 source UNHCR PDFs — not needed at runtime, but uploaded so the index's
+provenance is visible on the Space (upload the whole folder):
+
+```bash
+hf upload build-small-hackathon/fugee \
+  specs/data/guidelines specs/data/guidelines \
   --repo-type space
 ```
 

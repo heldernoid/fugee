@@ -14,6 +14,9 @@ agent/node_modules/
 # Generated documents (ephemeral)
 tmp/
 *.pdf
+# The source UNHCR guideline PDFs (RAG provenance) are NOT in git — the HF Hub
+# rejects binary files in plain git (must use Xet/LFS). They're uploaded to the
+# Space directly via `hf upload` (auto-Xet); see deploy/DEPLOY.md.
 
 # Environment
 .env
