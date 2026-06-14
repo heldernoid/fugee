@@ -12,7 +12,6 @@ commit_attribution = "Co-authored-by: Codex <noreply@openai.com>"
 # Files Codex reads at session start, in order.
 files = [
   "AGENTS.md",
-  "AGENTS.md",
   "DESIGN.md",
   "specs/ARCHITECTURE.md",
   "specs/PLAN.md",
