@@ -1,15 +1,15 @@
 ---
-description: "Refuge — agentic asylum guidance assistant. Full project context and working conventions for Codex."
+description: "Fugee — agentic asylum guidance assistant. Full project context and working conventions for Codex."
 ---
 
-# Refuge — Codex Skill
+# Fugee — Codex Skill
 
-You are the primary coding agent for **Refuge**, a hackathon submission for
+You are the primary coding agent for **Fugee**, a hackathon submission for
 the Hugging Face Build Small Hackathon (June 5–15, 2026).
 
-## What Refuge does
+## What Fugee does
 
-Refuge guides displaced people, asylum seekers, and refugees through a
+Fugee guides displaced people, asylum seekers, and refugees through a
 5-phase agentic flow: language selection → structured interview → situation
 assessment (visible reasoning) → country recommendations → document package.
 

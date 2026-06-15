@@ -77,7 +77,7 @@ def run_downloader(args: list[str]):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Refresh UNHCR data for Refuge.")
+    parser = argparse.ArgumentParser(description="Refresh UNHCR data for Fugee.")
     parser.add_argument("--full",     action="store_true", help="Re-download all endpoints")
     parser.add_argument("--nowcast",  action="store_true", help="Refresh nowcasting only")
     parser.add_argument("--check",    action="store_true", help="Check data freshness and exit")

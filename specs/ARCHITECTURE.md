@@ -1,4 +1,4 @@
-# ARCHITECTURE.md — Refuge
+# ARCHITECTURE.md — Fugee
 
 > System architecture, data flow, and component contracts.
 > Read `AGENTS.md` first, then this file, then `PLAN.md`.
@@ -7,7 +7,7 @@
 
 ## System Overview
 
-Refuge is a **single-process Python application**: a Gradio frontend and a
+Fugee is a **single-process Python application**: a Gradio frontend and a
 pure-Python agent loop running in the same process. There is no subprocess,
 no Node.js, no NDJSON bridge.
 

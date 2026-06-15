@@ -54,7 +54,7 @@ log = logging.getLogger("enrich")
 
 HEADERS = {
     "Accept": "application/json",
-    "User-Agent": "Refuge/1.0 (HuggingFace hackathon; humanitarian AI tool)",
+    "User-Agent": "Fugee/1.0 (HuggingFace hackathon; humanitarian AI tool)",
 }
 
 # ── Step 1: Build ISO3 → UNHCR code mapping ───────────────────────────────────

@@ -1,7 +1,7 @@
 """
 UNHCR Data Query Helper
 ========================
-Used internally by Refuge's country_lookup tool.
+Used internally by Fugee's country_lookup tool.
 Queries the local processed JSON files — no network required at runtime.
 
 This is the query layer between the agent tools and the downloaded data.
@@ -317,11 +317,11 @@ def get_footnotes(country_code: str) -> list[str]:
     ]
 
 
-# ── Composite: full country profile for Refuge ───────────────────────────────
+# ── Composite: full country profile for Fugee ───────────────────────────────
 
 @dataclass
 class CountryProfile:
-    """Everything Refuge needs about a potential asylum country for a given origin."""
+    """Everything Fugee needs about a potential asylum country for a given origin."""
     country: CountryInfo
     latest_acceptance_rate: Optional[AcceptanceRate]
     application_trend: list[dict]          # last 5 years of applications

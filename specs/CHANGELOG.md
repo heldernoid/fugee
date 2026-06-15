@@ -1,6 +1,6 @@
-# CHANGELOG — Refuge
+# CHANGELOG — Fugee
 
-All notable changes to Refuge are documented here.
+All notable changes to Fugee are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 Each release corresponds to a completed PLAN.md phase, signed off by the

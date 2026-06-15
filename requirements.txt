@@ -1,4 +1,4 @@
-# Refuge — Python dependencies (pure-Python, no Node.js)
+# Fugee — Python dependencies (pure-Python, no Node.js)
 # Versions pinned to one release before the latest available on 2026-06-07.
 # Do not upgrade during a phase without explicit developer approval (ARCHITECTURE.md).
 

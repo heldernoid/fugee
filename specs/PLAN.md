@@ -1,4 +1,4 @@
-# PLAN.md — Refuge Implementation Plan
+# PLAN.md — Fugee Implementation Plan
 
 > Spec-Driven Development plan. Each phase has tasks, success criteria, and
 > a hard human sign-off gate before the next phase begins.
@@ -69,7 +69,7 @@ echoes a ping.
 - [ ] T002 Create `requirements.txt` with pinned versions (Gradio, WeasyPrint, httpx, pytest)
 - [ ] T003 Add Python agent loop dependencies to `requirements.txt`:
         `ollama`, `litellm` (optional multi-provider), `pytest-asyncio`
-- [ ] T004 Create `app/app.py` — bare `gr.Blocks` that renders the Refuge wordmark and
+- [ ] T004 Create `app/app.py` — bare `gr.Blocks` that renders the Fugee wordmark and
         warm off-white background (`#F7F5F0`) matching `DESIGN.md §colors.background`
 - [ ] T005 Inject DESIGN.md CSS tokens as `:root` block into Gradio via `gr.Blocks(css=...)`
         — verify all 20+ token variables are present and match `DESIGN.md` exactly
@@ -89,7 +89,7 @@ echoes a ping.
         Each has a `type: str` field matching the event name.
 - [ ] T008 [P] Create `app/state/session.py` — `SessionState` dataclass + state machine enum
         matching `ARCHITECTURE.md §Session State Machine`
-- [ ] T009 [P] Create `app/prompts/system.md` — master system prompt establishing Refuge's
+- [ ] T009 [P] Create `app/prompts/system.md` — master system prompt establishing Fugee's
         persona (compassionate case worker, plain language, never "the applicant")
 - [ ] T010 Validate `DESIGN.md` tokens in Python — parse the YAML frontmatter and
         confirm every token referenced by the app's injected `:root` block resolves
@@ -113,7 +113,7 @@ echoes a ping.
 
 | ID | Criterion | How to verify |
 |----|-----------|---------------|
-| SC-001 | `python app/app.py` launches without error and shows Refuge wordmark on `#F7F5F0` background | Run `python app/app.py`, open browser, visually confirm |
+| SC-001 | `python app/app.py` launches without error and shows Fugee wordmark on `#F7F5F0` background | Run `python app/app.py`, open browser, visually confirm |
 | SC-002 | Background color exactly matches `DESIGN.md colors.background` (`#F7F5F0`) | Use browser devtools color picker on the `<body>` |
 | SC-003 | All `DESIGN.md` CSS tokens are present in the injected `:root` block | `grep --count "var(--" app/app.py` ≥ 20 |
 | SC-004 | `AgentLoop.run()` yields an `AgentStartEvent` within 3 seconds of first call | `pytest tests/unit/test_loop_ping.py -v` passes |
@@ -200,7 +200,7 @@ exactly. Language selection works, welcome copy renders correctly, trust note is
 
 - [ ] T030 Implement `app/phases/intake.py` — full Gradio intake screen matching
         `mockup.html #phase-1`:
-        - Refuge wordmark in Fraunces font
+        - Fugee wordmark in Fraunces font
         - Tagline: "Safe guidance for people on the move"
         - Language pills grid (≥ 8 languages: English, French, Arabic, Swahili,
           Amharic, Somali, Hausa, Portuguese) per `DESIGN.md §language-pill`
@@ -473,7 +473,7 @@ App is deployable to HF Spaces.
         `DESIGN.md` accessibility rules (contrast ≥ 4.5:1, visible focus rings, touch
         targets ≥ 44px) — 0 contrast failures. No Node/npm tooling (axe-core, Lighthouse).
 - [ ] T060 Write `README.md` for the HF Space:
-        - Brief description of Refuge
+        - Brief description of Fugee
         - How to run locally
         - Model requirements (`≥7B, tool-calling capable`)
         - Privacy note (no data stored)

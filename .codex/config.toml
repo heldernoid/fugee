@@ -1,8 +1,8 @@
-# .codex/config.toml — Codex CLI configuration for Refuge
+# .codex/config.toml — Codex CLI configuration for Fugee
 # Codex is the primary coding agent for this project.
 # This file configures attribution, approval gates, and agent context.
 
-model = "codex-1"
+model = "GPT-5.5"
 
 # Commit attribution — required for hackathon Codex track eligibility.
 # Every commit Codex makes must carry this trailer.

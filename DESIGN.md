@@ -1,5 +1,5 @@
 ---
-name: Refuge
+name: Fugee
 description: A calm, trustworthy guide that helps displaced people understand their legal options, find safe destination countries, and prepare their documentation — the digital equivalent of a knowledgeable, compassionate case worker.
 
 colors:
@@ -66,13 +66,13 @@ components:
   document-item:    { bg: surface, border: "1px line", radius: md, pad: "13px 14px", icon: "38px primary-tint square", action: "38px download button" }
 ---
 
-# Refuge — Design System
+# Fugee — Design System
 
 ## 1. Overview
 
-Refuge is an agentic assistant for displaced people, asylum seekers, and refugees. The people who use it are often frightened, exhausted, and making decisions that affect their safety and their family's future. The design exists to lower that fear, not to impress.
+Fugee is an agentic assistant for displaced people, asylum seekers, and refugees. The people who use it are often frightened, exhausted, and making decisions that affect their safety and their family's future. The design exists to lower that fear, not to impress.
 
-**Brand personality.** Refuge behaves like a knowledgeable, compassionate case worker — patient, clear, never rushed, never alarmist. It is competent without being clinical, warm without being saccharine, serious without being bureaucratic.
+**Brand personality.** Fugee behaves like a knowledgeable, compassionate case worker — patient, clear, never rushed, never alarmist. It is competent without being clinical, warm without being saccharine, serious without being bureaucratic.
 
 **Emotional target.** The first feeling should be *relief*: "someone calm is going to help me, and I am in control here." Every screen should reduce cognitive load and reinforce safety, privacy, and agency.
 
@@ -86,7 +86,7 @@ Refuge is an agentic assistant for displaced people, asylum seekers, and refugee
 - Corporate/government blue, harsh pure white (`#FFF` as the page background), and clinical gray UI.
 - Startup tropes: neon gradients, glassmorphism, oversized rounded everything, emoji as decoration.
 - Chatbot-generic patterns: a lone text box, bouncing 3-dot avatars as the whole personality, dark mode "AI" aesthetics.
-- Anything that feels like a form to be failed. Refuge guides; it does not gate.
+- Anything that feels like a form to be failed. Fugee guides; it does not gate.
 
 ---
 
@@ -94,7 +94,7 @@ Refuge is an agentic assistant for displaced people, asylum seekers, and refugee
 
 Color carries meaning here; it is never decorative for its own sake.
 
-- **Primary — Deep teal-green `#0E6A58`.** The voice of Refuge. Used for the agent, primary structure (avatars, progress, the roadmap spine), and trust signals. Teal-green reads as safety, growth, and steadiness without the cold authority of corporate blue. `primary-deep #0A5042` is its shadow/pressed companion and the color for text sitting on a teal tint. `primary-tint #E5EFEA` is the agent's "breath" — agent message bubbles, hovers, and quiet surfaces.
+- **Primary — Deep teal-green `#0E6A58`.** The voice of Fugee. Used for the agent, primary structure (avatars, progress, the roadmap spine), and trust signals. Teal-green reads as safety, growth, and steadiness without the cold authority of corporate blue. `primary-deep #0A5042` is its shadow/pressed companion and the color for text sitting on a teal tint. `primary-tint #E5EFEA` is the agent's "breath" — agent message bubbles, hovers, and quiet surfaces.
 - **Secondary — `#2E7D6C`.** A lighter supporting teal used only in gradients (e.g. the assessment progress bar) and subtle accents. Never competes with primary for attention.
 - **Accent — Warm amber `#E07B39`.** The single call-to-action color and the color of *the person* (user message bubbles, their selections). Amber is human warmth and forward motion — a lantern, not an alarm. Reserve it for the one thing you want the person to do next, and for representing the user's own voice. `accent-deep #C26329` handles hover/pressed and the solid drop-shadow under primary buttons. `accent-tint #FBEDE1` fills user bubbles and gentle highlights.
 - **Background — `#F7F5F0`.** Warm off-white, like paper. It makes the whole product feel calmer and more human than stark white and reduces glare for tired eyes.
@@ -110,7 +110,7 @@ Color carries meaning here; it is never decorative for its own sake.
 
 Two families, each with a clear job.
 
-- **Fraunces (display serif)** — the app name, page/section headings, country names, and document titles. Its soft, slightly old-style character is what makes Refuge feel human and institutional-in-a-good-way rather than like an app. Use it at weight 600 for headings, with tight tracking on large sizes.
+- **Fraunces (display serif)** — the app name, page/section headings, country names, and document titles. Its soft, slightly old-style character is what makes Fugee feel human and institutional-in-a-good-way rather than like an app. Use it at weight 600 for headings, with tight tracking on large sizes.
 - **Inter (UI sans)** — everything else: body copy, messages, labels, buttons, data. Chosen for its calm, highly legible letterforms at small sizes and across many languages/scripts.
 
 **Hierarchy & when to use it.**
@@ -140,7 +140,7 @@ Two families, each with a clear job.
 
 ## 5. Elevation & Depth
 
-Depth is **minimal and meaningful**. Refuge is paper-like and flat by default; elevation is used only to lift a true surface (a screen, a menu) off the page, never for decoration.
+Depth is **minimal and meaningful**. Fugee is paper-like and flat by default; elevation is used only to lift a true surface (a screen, a menu) off the page, never for decoration.
 
 - `shadow-sm` — `0 1px 2px rgba(13,46,38,.06)`: avatars, small chips, subtle hover lift on files/cards.
 - `shadow-md` — `0 6px 20px rgba(13,46,38,.08)`: the main "screen" frames that hold each phase.
@@ -175,7 +175,7 @@ Roundness communicates softness and safety here, applied on a consistent scale.
 
 **Phase pill / progress rail (`phase-pill`).** A horizontal row of numbered 22px dots joined by short hairlines. *Done* = filled teal dot with a white check, secondary-color label. *Active* = filled amber dot with a 4px `accent-tint` halo and a bold, full-strength label. *Upcoming* = white dot, `line-strong` border, muted number. On mobile, hide the text and keep the dots. Order for the interview: Intake → Situation → History → Goals → Review.
 
-**Messages (`message-agent`, `message-user`).** Agent messages sit left with a 34px teal avatar bearing the white Refuge mark; bubble is `primary-tint` with a 5px-flattened bottom-left corner. User messages sit right with an amber avatar; bubble is `accent-tint` with a flattened bottom-right corner. The *current* agent question is a white bubble with a teal-tint border and `shadow-sm` so it stands out as "this is what we're answering now." A `thinking` indicator (three teal dots, gentle blink) plus a short reassuring phrase ("Refuge is listening") communicates streaming — never a spinner.
+**Messages (`message-agent`, `message-user`).** Agent messages sit left with a 34px teal avatar bearing the white Fugee mark; bubble is `primary-tint` with a 5px-flattened bottom-left corner. User messages sit right with an amber avatar; bubble is `accent-tint` with a flattened bottom-right corner. The *current* agent question is a white bubble with a teal-tint border and `shadow-sm` so it stands out as "this is what we're answering now." A `thinking` indicator (three teal dots, gentle blink) plus a short reassuring phrase ("Fugee is listening") communicates streaming — never a spinner.
 
 **Structured responder.** Below the current question, the answer control adapts to the question via a small segmented switch (Choice / Country / Free text):
 - *Multiple-choice pills* — round, single- or multi-select; selected pill fills teal with a leading check. Comfortable 44px tap height.
@@ -188,7 +188,7 @@ Roundness communicates softness and safety here, applied on a consistent scale.
 
 **Language pill (`language-pill`).** Round, white, hairline border; shows the language in its own script with a small romanized gloss. Selected = filled teal. Used in the intake grid; wraps freely.
 
-**Document item (`document-item`).** A row with a 38px `primary-tint` file-type icon, a bold title + muted meta line (format, pages, languages), and a 38px download button that fills teal on hover. **Checklist items** use a custom 22px checkbox that fills `success` with a white check when ticked; checked rows mute and strike their label. **Document preview** is a white, page-like card with a soft bottom fade; interview-derived values are highlighted with an `accent-tint` "fill" mark to show what Refuge pre-filled.
+**Document item (`document-item`).** A row with a 38px `primary-tint` file-type icon, a bold title + muted meta line (format, pages, languages), and a 38px download button that fills teal on hover. **Checklist items** use a custom 22px checkbox that fills `success` with a white check when ticked; checked rows mute and strike their label. **Document preview** is a white, page-like card with a soft bottom fade; interview-derived values are highlighted with an `accent-tint` "fill" mark to show what Fugee pre-filled.
 
 **Trust note.** A small rounded-full chip with a lock glyph reaffirming privacy. Quiet, persistent, never a modal.
 
@@ -198,7 +198,7 @@ Roundness communicates softness and safety here, applied on a consistent scale.
 
 **Do**
 - Keep one clear primary action (amber) per screen; everything else is secondary or ghost.
-- Use teal for *Refuge's* voice and structure, amber for *the person* and their next step.
+- Use teal for *Fugee's* voice and structure, amber for *the person* and their next step.
 - Show the agent's reasoning openly; prefer a written, progressive "document being thought through" over spinners.
 - Address the person as "you," in plain, respectful, reassuring language. Offer "Save and continue later" wherever the journey is long.
 - Let layouts breathe — honor the spacing scale and the 64px section rhythm.

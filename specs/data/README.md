@@ -1,6 +1,6 @@
 # specs/data/
 
-Curated reference data for the Refuge country recommendation system.
+Curated reference data for the Fugee country recommendation system.
 
 ## Files
 

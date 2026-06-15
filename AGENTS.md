@@ -8,7 +8,7 @@
 
 ## Project Identity
 
-**Refuge** — agentic asylum guidance assistant
+**Fugee** — agentic asylum guidance assistant
 **Hackathon**: Hugging Face Build Small Hackathon, June 5–15 2026
 **Stack**: Python + Gradio (UI) / Pure-Python agent loop (ported from pi-agent-core) / ≤32B LLM via Ollama
 **Audience**: Displaced people, asylum seekers, refugees. High-stakes product.

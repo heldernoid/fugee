@@ -156,7 +156,7 @@ ENDPOINTS = {
         "paginated": True,
         "refresh_frequency": "annual",
         "refuge_use": (
-            "THE most important endpoint for Refuge. "
+            "THE most important endpoint for Fugee. "
             "Acceptance rates per origin × asylum country pair. "
             "Used in Phase 3 assessment to score country recommendations. "
             "E.g. 'Ethiopians in Kenya: 78% total protection rate (2023)'."
@@ -402,7 +402,7 @@ def download_endpoint(name: str, cfg: dict, year_from: int | None = None) -> dic
     clean_params = {key_map.get(k, k): v for k, v in params.items()}
 
     with httpx.Client(
-        headers={"Accept": "application/json", "User-Agent": "Refuge/1.0 (hackathon; contact via HF)"},
+        headers={"Accept": "application/json", "User-Agent": "Fugee/1.0 (hackathon; contact via HF)"},
         follow_redirects=True,
     ) as client:
         if cfg["paginated"]:
@@ -455,7 +455,7 @@ def update_manifest(summaries: list[dict]):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Download UNHCR Refugee Statistics API data for Refuge."
+        description="Download UNHCR Refugee Statistics API data for Fugee."
     )
     parser.add_argument("--all",       action="store_true", help="Download all endpoints")
     parser.add_argument("--refresh",   action="store_true", help="Re-download annual endpoints only")
